@@ -1,0 +1,55 @@
+// Função para gerar um número aleatório
+@function random_range($min, $max) {
+  $rand: random();
+  $random_range: $min + floor($rand * (($max - $min) + 1));
+  @return $random_range;
+}
+
+// Função para gerar as sombras de N estrelas
+@function multiple-box-shadow($n) {
+  $value: '#{random_range(0, 2000)}px #{random_range(0, 2000)}px #FFF';
+  @for $i from 2 through $n {
+    $value: '#{$value} , #{random_range(0, 2000)}px #{random_range(0, 2000)}px #FFF';
+  }
+  @return unquote($value);
+}
+
+@keyframes animStar {
+  from {
+    transform: translateY(-100vh); // Começa um pouco acima da tela
+  }
+  to {
+    transform: translateY(100vh); // Termina um pouco abaixo da tela
+  }
+}
+
+.starLayer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  background: none;
+  top: 50vh; // Posiciona no centro vertical da viewport
+  left: 0;
+}
+
+.stars {
+  @extend .starLayer;
+  box-shadow: multiple-box-shadow(700);
+  animation: animStar 100s linear infinite;
+}
+
+.stars2 {
+  @extend .starLayer;
+  width: 2px;
+  height: 2px;
+  box-shadow: multiple-box-shadow(200);
+  animation: animStar 150s linear infinite;
+}
+
+.stars3 {
+  @extend .starLayer;
+  width: 3px;
+  height: 3px;
+  box-shadow: multiple-box-shadow(100);
+  animation: animStar 200s linear infinite;
+}

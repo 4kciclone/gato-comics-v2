@@ -1,0 +1,323 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --------------------------------------------------------
+// ENUMS (SINTAXE CORRIGIDA)
+// --------------------------------------------------------
+enum UserRole {
+  USER
+  ADMIN
+  OWNER
+}
+enum UnlockType {
+  RENTAL
+  PERMANENT
+}
+enum TransactionType {
+  DEPOSIT
+  SPEND
+  EARN
+  BONUS
+}
+enum CurrencyType {
+  PREMIUM
+  LITE
+}
+enum LibraryStatus {
+  READING
+  COMPLETED
+  ON_HOLD
+  DROPPED
+  PLAN_TO_READ
+}
+enum CosmeticType {
+  AVATAR_FRAME
+  COMMENT_BACKGROUND
+  USERNAME_COLOR
+  PROFILE_BANNER
+}
+enum CosmeticRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+enum ReportStatus {
+  PENDING
+  RESOLVED
+}
+
+// --------------------------------------------------------
+// MODELOS DE USUÁRIO & ECONOMIA
+// --------------------------------------------------------
+model User {
+  id                        String        @id @default(cuid())
+  username                  String?       @unique
+  name                      String?
+  email                     String        @unique
+  emailVerified             DateTime?
+  image                     String?
+  password                  String?
+  role                      UserRole      @default(USER)
+  balancePremium            Int           @default(0)
+  balanceLite               Int           @default(0)
+  xp                        Int           @default(0)
+  mutedUntil                DateTime?
+  equippedAvatarFrameId     String?
+  equippedCommentBackgroundId String?
+  equippedProfileBannerId   String?
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+
+  equippedAvatarFrame       Cosmetic?     @relation("EquippedAvatarFrame", fields: [equippedAvatarFrameId], references: [id], onDelete: SetNull)
+  equippedCommentBackground Cosmetic?     @relation("EquippedCommentBg", fields: [equippedCommentBackgroundId], references: [id], onDelete: SetNull)
+  equippedProfileBanner     Cosmetic?     @relation("EquippedProfileBanner", fields: [equippedProfileBannerId], references: [id], onDelete: SetNull)
+  
+  transactions              Transaction[]
+  unlocks                   Unlock[]
+  reviews                   Review[]
+  library                   LibraryEntry[]
+  cosmetics                 UserCosmetic[]
+  comments                  Comment[]
+  posts                     Post[]
+  likes                     Like[]
+  following                 Follow[]      @relation("Following")
+  followers                 Follow[]      @relation("Followers")
+  reportsMade               Report[]      @relation("Reporter")
+  notifications             Notification[] @relation("Notifications")
+  originNotifications       Notification[] @relation("OriginNotifications")
+  workLikes                 WorkLike[]
+
+  @@map("users")
+}
+
+// ... (Todos os outros modelos permanecem exatamente os mesmos)
+model Transaction {
+  id          String          @id @default(cuid())
+  userId      String
+  amount      Int
+  currency    CurrencyType
+  type        TransactionType
+  description String?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("transactions")
+}
+model Work {
+  id             String         @id @default(cuid())
+  title          String
+  slug           String         @unique
+  synopsis       String         @db.Text
+  coverUrl       String
+  bannerUrl      String?
+  author         String
+  artist         String?
+  studio         String?
+  genres         String[]
+  isAdult        Boolean        @default(false)
+  isHidden       Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  chapters       Chapter[]
+  reviews        Review[]
+  libraryEntries LibraryEntry[]
+  comments       Comment[]
+  likes          WorkLike[]
+  @@map("works")
+}
+model Chapter {
+  id           String    @id @default(cuid())
+  workId       String
+  title        String
+  slug         String
+  order        Float
+  pricePremium Int       @default(3)
+  priceLite    Int       @default(10)
+  isFree       Boolean   @default(false)
+  images       String[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  work         Work      @relation(fields: [workId], references: [id], onDelete: Cascade)
+  unlocks      Unlock[]
+  comments     Comment[]
+  @@unique([workId, slug])
+  @@unique([workId, order])
+  @@index([workId])
+  @@map("chapters")
+}
+model Unlock {
+  id        String     @id @default(cuid())
+  userId    String
+  chapterId String
+  type      UnlockType
+  expiresAt DateTime?
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter   Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  @@unique([userId, chapterId])
+  @@map("unlocks")
+}
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  workId    String
+  rating    Int      @default(5)
+  text      String?  @db.Text
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  @@unique([userId, workId])
+  @@map("reviews")
+}
+model LibraryEntry {
+  id                String        @id @default(cuid())
+  userId            String
+  workId            String
+  status            LibraryStatus @default(READING)
+  lastReadChapterId String?
+  updatedAt         DateTime      @updatedAt
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work              Work          @relation(fields: [workId], references: [id], onDelete: Cascade)
+  @@unique([userId, workId])
+  @@map("library_entries")
+}
+model Comment {
+  id        String    @id @default(cuid())
+  content   String    @db.Text
+  isSpoiler Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  userId    String
+  workId    String?
+  chapterId String?
+  postId    String?
+  parentId  String?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work      Work?     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  chapter   Chapter?  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  post      Post?     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent    Comment?  @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  replies   Comment[] @relation("Replies")
+  reports   Report[]
+  @@index([workId])
+  @@index([chapterId])
+  @@index([postId])
+  @@index([parentId])
+  @@map("comments")
+}
+model Cosmetic {
+  id                     String         @id @default(cuid())
+  name                   String
+  description            String
+  type                   CosmeticType
+  rarity                 CosmeticRarity
+  price                  Int
+  imageUrl               String
+  isActive               Boolean        @default(true)
+  owners                 UserCosmetic[]
+  equippedAvatarFrames   User[]         @relation("EquippedAvatarFrame")
+  equippedCommentBgs     User[]         @relation("EquippedCommentBg")
+  equippedProfileBanners User[]         @relation("EquippedProfileBanner")
+  @@map("cosmetics")
+}
+model UserCosmetic {
+  userId     String
+  cosmeticId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmetic   Cosmetic @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
+  @@id([userId, cosmeticId])
+  @@map("user_cosmetics")
+}
+model Setting {
+  key   String @id
+  value String
+  @@map("settings")
+}
+model Post {
+  id        String    @id @default(cuid())
+  content   String    @db.Text
+  imageUrl  String?
+  createdAt DateTime  @default(now())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes     Like[]
+  parentId  String?
+  parent    Post?     @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  replies   Post[]    @relation("Replies")
+  comments  Comment[]
+  reports Report[]
+  @@index([userId])
+  @@index([parentId])
+  @@map("posts")
+}
+model Like {
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  @@id([userId, postId])
+  @@map("likes")
+}
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  @@id([followerId, followingId])
+  @@map("follows")
+}
+model Report {
+  id         String       @id @default(cuid())
+  reason     String
+  notes      String?      @db.Text
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+
+  // Relações (AGORA OPCIONAIS)
+  commentId  String?
+  comment    Comment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  
+  postId     String? // <-- NOVO
+  post       Post?       @relation(fields: [postId], references: [id], onDelete: Cascade) // <-- NOVO
+  
+  reporterId String
+  reporter   User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+  @@index([postId]) // <-- NOVO
+  @@index([reporterId])
+  @@map("reports")
+}
+model Notification {
+  id           String   @id @default(cuid())
+  userId       String
+  originUserId String
+  type         String
+  link         String
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  user         User     @relation("Notifications", fields: [userId], references: [id], onDelete: Cascade)
+  originUser   User     @relation("OriginNotifications", fields: [originUserId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("notifications")
+}
+model WorkLike {
+  userId    String
+  workId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  @@id([userId, workId])
+  @@map("work_likes")
+}

@@ -1,0 +1,105 @@
+import Link from "next/link";
+import Image from "next/image";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { Button } from "@/components/ui/button";
+import { UserNav } from "@/components/shared/user-nav";
+import { RewardModal } from "@/components/rewards/reward-modal";
+import { NotificationBell } from "@/components/shared/notification-bell";
+import { Starfield } from "@/components/shared/starfield";
+import { MobileDrawer } from "@/components/shared/mobile-drawer";
+import { Search } from "lucide-react";
+import Logo from './logo.png';
+
+type NotificationWithUser = {
+  id: string;
+  type: string;
+  link: string;
+  originUser: {
+    name: string | null;
+  };
+};
+
+export default async function MainLayout({ children }: { children: React.ReactNode; }) {
+  const session = await auth();
+  let userBalance = { premium: 0, lite: 0 };
+  let notifications: NotificationWithUser[] = [];
+  let username: string | null = null;
+
+  if (session?.user?.id) {
+    const [dbUser, unreadNotifications] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { username: true, balancePremium: true, balanceLite: true }
+      }),
+      prisma.notification.findMany({
+          where: { userId: session.user.id, isRead: false },
+          orderBy: { createdAt: 'desc' }, take: 10,
+          include: { originUser: { select: { name: true } } }
+      })
+    ]);
+    if (dbUser) {
+      username = dbUser.username;
+      userBalance = { premium: dbUser.balancePremium, lite: dbUser.balanceLite };
+    }
+    notifications = unreadNotifications;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col font-sans">
+      <header className="sticky top-0 z-50 w-full h-20 shadow-lg shadow-black/20">
+        <div className="absolute inset-0 bg-linear-to-r from-[#FFD700] to-[#DAA520]" />
+        <Starfield />
+        
+        <div className="container mx-auto px-4 h-full flex items-center justify-between relative z-10">
+          <div className="flex items-center gap-6">
+            <div className="md:hidden">
+              {/* CORREÇÃO: Passando a prop 'isLoggedIn' */}
+              <MobileDrawer username={username} isLoggedIn={!!session?.user} />
+            </div>
+            <Link href="/" className="hidden md:block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={Logo.src} alt="Gato Comics Logo" style={{ width: 180, height: 'auto' }} />
+            </Link>
+            <nav className="hidden md:flex items-center gap-2">
+              <Link href="/social"><Button variant="link" className="text-black font-semibold text-base hover:bg-black/10">Social</Button></Link>
+              <Link href="/busca"><Button variant="link" className="text-black font-semibold text-base hover:bg-black/10">Catálogo</Button></Link>
+            </nav>
+          </div>
+
+          <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+             <Link href="/">
+               {/* eslint-disable-next-line @next/next/no-img-element */}
+               <img src={Logo.src} alt="Gato Comics Logo" style={{ width: 140, height: 'auto' }} />
+             </Link>
+          </div>
+
+          <div className="flex items-center gap-1 md:gap-2">
+            {session?.user ? (
+               <>
+                  <div className="hidden md:flex items-center gap-1">
+                    <RewardModal />
+                    <NotificationBell initialNotifications={notifications} />
+                  </div>
+                  <UserNav user={session.user} balance={userBalance} />
+               </>
+            ) : ( 
+               <Link href="/login">
+                  <Button className="bg-black/20 hover:bg-black/40 text-white font-bold rounded-full">Entrar</Button>
+               </Link>
+            )}
+            <div className="md:hidden">
+              <Button variant="ghost" size="icon" className="text-black hover:bg-black/10"><Search className="w-5 h-5"/></Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1">{children}</main>
+      
+      <footer className="border-t border-[#27272a] bg-[#0a0a0a] py-12 mt-auto">
+        {/* ... */}
+      </footer>
+    </div>
+  );
+}
