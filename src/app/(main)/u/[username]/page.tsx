@@ -6,9 +6,7 @@ import { PostCard, type PostWithMeta } from "@/components/social/post-card";
 import { FollowButton } from "@/components/profile/follow-button";
 import { Calendar, MapPin } from "lucide-react";
 import { Prisma } from "@prisma/client";
-export async function generateStaticParams() {
-  return [];
-}
+
 // Força a página a ser sempre dinâmica e nunca usar cache
 export const dynamic = 'force-dynamic';
 
