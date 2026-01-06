@@ -7,26 +7,24 @@ import { CommentSection } from "@/components/comments/comment-section";
 import { ArrowLeft } from "lucide-react";
 import { Prisma } from "@prisma/client";
 
+// Tipagem correta para a prop 'params' em Server Components
 interface PostPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default async function PostPage({ params }: PostPageProps) {
-  const { id } = params;
+  // CORREÇÃO: Usamos 'await' para extrair o 'id' da Promise
+  const { id } = await params;
+  
   const session = await auth();
   const userId = session?.user?.id;
 
-  // Função interna para buscar o post principal e suas respostas
-  const getPostWithReplies = async (postId: string) => {
-    // Objeto 'include' reutilizável
+  // A função para buscar os dados agora receberá um 'id' válido
+  const getPostWithData = async (postId: string) => {
     const postInclude = Prisma.validator<Prisma.PostInclude>()({
         user: { 
-            // CORREÇÃO: Adicionados 'id' e 'username'
             select: { 
-                id: true, 
-                name: true, 
-                username: true, 
-                image: true, 
+                id: true, name: true, username: true, image: true, 
                 equippedAvatarFrame: { select: { imageUrl: true } } 
             } 
         },
@@ -36,26 +34,17 @@ export default async function PostPage({ params }: PostPageProps) {
 
     const postData = await prisma.post.findUnique({
       where: { id: postId },
-      include: {
-        ...postInclude,
-        // Mantemos a busca de replies aqui, que também precisa do include
-        replies: {
-          orderBy: { createdAt: 'asc' },
-          include: postInclude
-        }
-      }
+      include: postInclude
     });
 
-    if (!postData) return null;
+    if (!postData || !postData.user) return null;
 
     const mainPost: PostWithMeta = { ...postData, isLiked: postData.likes.length > 0 };
     
-    // O Prisma/TS pode se confundir com o tipo aninhado, então adicionamos uma verificação.
-    // Agora o `map` não é mais necessário aqui pois a refatoração unificou o Comment System
-    return { mainPost, replies: [] }; // As 'respostas' agora são 'comentários'
+    return { mainPost };
   };
 
-  const data = await getPostWithReplies(id);
+  const data = await getPostWithData(id);
 
   if (!data) {
     return notFound();
@@ -76,14 +65,10 @@ export default async function PostPage({ params }: PostPageProps) {
       {/* Renderiza o Post Principal em destaque */}
       <PostCard post={mainPost} />
       
-      {/* 
-        A lógica de 'Respostas' foi movida e unificada para dentro do 'CommentSection',
-        pois as respostas agora são Comentários ligados ao Post.
-      */}
+      {/* A seção de comentários busca seus próprios dados */}
       <div className="p-4 md:p-6">
         <CommentSection postId={mainPost.id} />
       </div>
-
     </div>
   );
 }
