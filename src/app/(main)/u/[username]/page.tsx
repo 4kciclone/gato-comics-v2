@@ -7,9 +7,7 @@ import { FollowButton } from "@/components/profile/follow-button";
 import { Calendar, MapPin } from "lucide-react";
 import { Prisma } from "@prisma/client";
 
-// Força a página a ser renderizada dinamicamente a cada requisição,
-// desabilitando o cache de dados e de rota do Next.js.
-// Esta é a medida mais forte para garantir que os dados sejam sempre frescos.
+// Força a página a ser sempre dinâmica e nunca usar cache
 export const dynamic = 'force-dynamic';
 
 interface ProfilePageProps {
@@ -17,21 +15,28 @@ interface ProfilePageProps {
 }
 
 export default async function UserProfilePage({ params }: ProfilePageProps) {
-  // --- LOG 1: Verificar o parâmetro recebido pela rota ---
-  console.log(`[SERVER /u/[username]] --- INICIANDO RENDERIZAÇÃO PARA PARÂMETRO: ${params.username} ---`);
-
   const { username } = params;
+
+  // --- GUARDA DE SEGURANÇA ---
+  // Se, por qualquer motivo de roteamento, o 'username' chegar como undefined,
+  // retorna um 404 imediatamente para evitar a query inválida.
+  if (!username) {
+    console.error("[SERVER /u/[username]] ERRO GRAVE: Parâmetro 'username' chegou como undefined.");
+    return notFound();
+  }
+
+  console.log(`[SERVER /u/[username]] --- INICIANDO RENDERIZAÇÃO PARA PARÂMETRO: ${username} ---`);
+
   const session = await auth();
   const sessionUserId = session?.user?.id;
 
-  // --- LOG 2: Verificar o valor que será usado na query ---
   console.log(`[SERVER /u/[username]] Buscando no Prisma com 'username' = '${username}'`);
 
   const user = await prisma.user.findFirst({
     where: { 
         username: {
             equals: username,
-            mode: "insensitive" // Garante que a busca não diferencia maiúsculas de minúsculas
+            mode: "insensitive"
         }
     },
     include: {
@@ -42,7 +47,6 @@ export default async function UserProfilePage({ params }: ProfilePageProps) {
     },
   });
 
-  // --- LOG 3: Verificar o resultado da query ---
   if (!user) {
     console.log(`[SERVER /u/[username]] USUÁRIO NÃO ENCONTRADO para '${username}'. Retornando 404.`);
     return notFound();
