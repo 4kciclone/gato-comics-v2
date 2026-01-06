@@ -7,20 +7,31 @@ import { FollowButton } from "@/components/profile/follow-button";
 import { Calendar, MapPin } from "lucide-react";
 import { Prisma } from "@prisma/client";
 
+// Força a página a ser renderizada dinamicamente a cada requisição,
+// desabilitando o cache de dados e de rota do Next.js.
+// Esta é a medida mais forte para garantir que os dados sejam sempre frescos.
+export const dynamic = 'force-dynamic';
+
 interface ProfilePageProps {
   params: { username: string };
 }
 
 export default async function UserProfilePage({ params }: ProfilePageProps) {
+  // --- LOG 1: Verificar o parâmetro recebido pela rota ---
+  console.log(`[SERVER /u/[username]] --- INICIANDO RENDERIZAÇÃO PARA PARÂMETRO: ${params.username} ---`);
+
   const { username } = params;
   const session = await auth();
   const sessionUserId = session?.user?.id;
+
+  // --- LOG 2: Verificar o valor que será usado na query ---
+  console.log(`[SERVER /u/[username]] Buscando no Prisma com 'username' = '${username}'`);
 
   const user = await prisma.user.findFirst({
     where: { 
         username: {
             equals: username,
-            mode: "insensitive"
+            mode: "insensitive" // Garante que a busca não diferencia maiúsculas de minúsculas
         }
     },
     include: {
@@ -31,9 +42,12 @@ export default async function UserProfilePage({ params }: ProfilePageProps) {
     },
   });
 
+  // --- LOG 3: Verificar o resultado da query ---
   if (!user) {
+    console.log(`[SERVER /u/[username]] USUÁRIO NÃO ENCONTRADO para '${username}'. Retornando 404.`);
     return notFound();
   }
+  console.log(`[SERVER /u/[username]] Usuário encontrado: ${user.name} (ID: ${user.id})`);
 
   const isFollowing = sessionUserId ? !!(await prisma.follow.findUnique({
     where: {
@@ -100,7 +114,6 @@ export default async function UserProfilePage({ params }: ProfilePageProps) {
             <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> Brasil</div>
             <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" /> 
-                {/* CORREÇÃO: Formatação da data para string */}
                 Entrou em {new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
             </div>
           </div>
