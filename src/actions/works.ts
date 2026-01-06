@@ -1,25 +1,9 @@
-'use server';
+"use server";
 
-import { prisma } from '@/lib/prisma';
-import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
-// 1. Schema de Validação (Zod)
-const CreateWorkSchema = z.object({
-  title: z.string().min(3, "O título deve ter pelo menos 3 letras"),
-  slug: z.string().min(3).regex(/^[a-z0-9-]+$/, "Slug inválido (use a-z, 0-9, -)"),
-  synopsis: z.string().min(10, "A sinopse deve ter pelo menos 10 caracteres"),
-  author: z.string().min(2, "Nome do autor é obrigatório"),
-  artist: z.string().optional(),
-  studio: z.string().optional(),
-  coverUrl: z.string().url("Deve ser uma URL válida"),
-  // Transforma "Ação, Isekai" em ["Ação", "Isekai"]
-  genres: z.string().transform((str) => 
-    str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
-  ),
-});
-
-// 2. Definição de Tipos para o Frontend
 export type WorkState = {
   errors?: {
     title?: string[];
@@ -34,21 +18,21 @@ export type WorkState = {
   message?: string | null;
 };
 
-// 3. A Função Server Action
+// Ação para CRIAR uma nova obra
 export async function createWork(prevState: WorkState, formData: FormData): Promise<WorkState> {
-  // Validação dos dados brutos
-  const validatedFields = CreateWorkSchema.safeParse({
-    title: formData.get('title'),
-    slug: formData.get('slug'),
-    synopsis: formData.get('synopsis'),
-    author: formData.get('author'),
-    artist: formData.get('artist'),
-    studio: formData.get('studio'),
-    coverUrl: formData.get('coverUrl'),
-    genres: formData.get('genres'),
+  const CreateWorkSchema = z.object({
+    title: z.string().min(3, "O título deve ter pelo menos 3 letras"),
+    slug: z.string().min(3).regex(/^[a-z0-9-]+$/, "Slug inválido (use a-z, 0-9, -)"),
+    synopsis: z.string().min(10, "A sinopse deve ter pelo menos 10 caracteres"),
+    author: z.string().min(2, "Nome do autor é obrigatório"),
+    artist: z.string().optional(),
+    studio: z.string().optional(),
+    coverUrl: z.string().url("Deve ser uma URL válida"),
+    genres: z.string().transform((str) => str.split(',').map((s) => s.trim()).filter((s) => s.length > 0)),
   });
 
-  // Se falhar na validação do Zod
+  const validatedFields = CreateWorkSchema.safeParse(Object.fromEntries(formData));
+
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
@@ -59,36 +43,48 @@ export async function createWork(prevState: WorkState, formData: FormData): Prom
   const { title, slug, synopsis, author, artist, studio, coverUrl, genres } = validatedFields.data;
 
   try {
-    // Inserção no Banco de Dados
     await prisma.work.create({
       data: {
-        title,
-        slug,
-        synopsis,
-        author,
-        artist,
-        studio,
-        coverUrl,
-        genres, // Array de strings nativo do Postgres
-        isAdult: formData.get('isAdult') === 'on', // Checkbox retorna 'on' ou null
-        isHidden: true, // Padrão: Oculto até ter capítulos
+        title, slug, synopsis, author, artist, studio, coverUrl, genres,
+        isAdult: formData.get('isAdult') === 'on',
+        isHidden: true, // Começa como OCULTO por padrão
       },
     });
   } catch (error) {
-    // Tratamento de erro de chave única (Slug duplicado)
     if ((error as any).code === 'P2002') {
-      return {
-        message: 'Este slug já está em uso. Escolha outro.',
-      };
+      return { message: 'Este slug já está em uso.' };
     }
     console.error('Database Error:', error);
-    return {
-      message: 'Erro interno ao salvar no banco de dados.',
-    };
+    return { message: 'Erro interno ao salvar no banco de dados.' };
   }
 
-  // Atualiza as rotas necessárias
   revalidatePath('/admin/works');
-  
   return { message: 'Obra criada com sucesso!' };
+}
+
+/**
+ * Server Action para alternar o estado de visibilidade de uma obra (público/oculto).
+ */
+export async function toggleWorkVisibility(workId: string, currentState: boolean) {
+  try {
+    const updatedWork = await prisma.work.update({
+      where: { id: workId },
+      data: {
+        isHidden: !currentState, // Inverte o estado booleano atual
+      },
+      select: { slug: true } // Seleciona apenas o slug para revalidação
+    });
+
+    // Revalida todas as páginas que podem ser afetadas por esta mudança
+    revalidatePath("/admin/works");             // Lista de obras no admin
+    revalidatePath(`/admin/works/${workId}`);    // Página de detalhes da obra no admin
+    revalidatePath(`/obra/${updatedWork.slug}`);// Página pública da obra
+    revalidatePath("/");                         // Home page (pode listar a obra)
+    revalidatePath("/busca");                    // Página de busca
+
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao alterar visibilidade da obra:", error);
+    return { error: "Não foi possível alterar a visibilidade da obra." };
+  }
 }
