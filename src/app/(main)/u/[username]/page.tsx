@@ -6,6 +6,7 @@ import { PostCard, type PostWithMeta } from "@/components/social/post-card";
 import { FollowButton } from "@/components/profile/follow-button";
 import { Calendar, MapPin } from "lucide-react";
 import { Prisma } from "@prisma/client";
+export const dynamic = 'force-dynamic';
 
 interface ProfilePageProps {
   params: { username: string }; // Parâmetro já decodificado
