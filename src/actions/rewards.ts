@@ -97,3 +97,28 @@ export async function watchAdReward() {
   revalidatePath("/");
   return { success: true, amount: AD_REWARD_AMOUNT, remaining: MAX_ADS_PER_DAY - (adCount + 1) };
 }
+
+export async function getRewardStatus() {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return { error: "Não autenticado", dailyClaimed: true, adsWatched: 5 };
+    }
+
+    const userId = session.user.id;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [dailyClaim, adCount] = await Promise.all([
+        prisma.transaction.findFirst({
+            where: { userId, type: "EARN", description: "Check-in Diário", createdAt: { gte: today } },
+        }),
+        prisma.transaction.count({
+            where: { userId, type: "EARN", description: "Anúncio Assistido", createdAt: { gte: today } },
+        })
+    ]);
+
+    return {
+        dailyClaimed: !!dailyClaim,
+        adsWatched: adCount
+    };
+}

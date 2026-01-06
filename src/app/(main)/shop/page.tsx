@@ -137,13 +137,13 @@ export default async function ShopPage(props: ShopPageProps) {
           <AccordionItem value="item-1" className="border border-[#27272a] bg-[#111] rounded-lg px-4">
             <AccordionTrigger className="text-white hover:text-[#FFD700] hover:no-underline">As Patinhas Premium expiram?</AccordionTrigger>
             <AccordionContent className="text-zinc-400">
-              Não! Patinhas compradas com dinheiro real (Premium) são suas para sempre. Apenas as Patinhas Lite (ganhas em eventos/ads) expiram em 72h.
+              Não! Patinhas compradas com dinheiro real (Premium) são suas para sempre. Apenas as Patinhas Lite (ganhas em eventos/ads) expiram em <strong>7 dias</strong>.
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="item-2" className="border border-[#27272a] bg-[#111] rounded-lg px-4">
             <AccordionTrigger className="text-white hover:text-[#FFD700] hover:no-underline">O desbloqueio de capítulo é permanente?</AccordionTrigger>
             <AccordionContent className="text-zinc-400">
-              Sim! Ao usar Patinhas Premium, o capítulo é seu para sempre (Compra). Se usar Patinhas Lite, é um Aluguel de 72 horas.
+              Sim! Ao usar Patinhas Premium, o capítulo é seu em quanto a conta existir. Se usar Patinhas Lite, é um Aluguel de 72 horas.
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="item-3" className="border border-[#27272a] bg-[#111] rounded-lg px-4">

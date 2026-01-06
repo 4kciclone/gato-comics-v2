@@ -85,7 +85,7 @@ export function Paywall({
               className="w-full h-14 bg-[#FFD700] text-black hover:bg-[#FFD700]/90 font-bold flex justify-between items-center px-4"
             >
               <div className="flex flex-col items-start">
-                <span className="text-sm">Comprar (Vitalício)</span>
+                <span className="text-sm">Desbloquear</span>
                 <span className="text-xs opacity-70">Nunca expira</span>
               </div>
               <div className="flex items-center gap-2">

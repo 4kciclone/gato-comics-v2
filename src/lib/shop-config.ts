@@ -7,8 +7,8 @@ export const COIN_PACKS = {
 };
 
 export const SUBSCRIPTION_PLANS = {
-  "sub_bronze":   { label: "Bronze",      price: 699,  monthlyPaws: 10, discount: 5,  works: 1 },
-  "sub_silver":   { label: "Prata",       price: 1499, monthlyPaws: 15, discount: 8,  works: 2 },
-  "sub_gold":     { label: "Ouro",        price: 2599, monthlyPaws: 20, discount: 10, works: 3, recommended: true },
-  "sub_platinum": { label: "Rei Platina", price: 3599, monthlyPaws: 30, discount: 15, works: 7 },
+  "sub_bronze":   { label: "Bronze",      price: 699,  monthlyPaws: 10, discount: 5,  works: 1, icon: "zap" },
+  "sub_silver":   { label: "Prata",       price: 1499, monthlyPaws: 15, discount: 8,  works: 2, icon: "sparkles" },
+  "sub_gold":     { label: "Ouro",        price: 2599, monthlyPaws: 20, discount: 10, works: 3, icon: "crown", recommended: true },
+  "sub_platinum": { label: "Rei Platina", price: 3599, monthlyPaws: 30, discount: 15, works: 7, icon: "diamond" }, 
 };
