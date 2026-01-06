@@ -6,6 +6,7 @@ import { WorkCard } from "@/components/home/work-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge"; // Importação corrigida
 import { RecommendationsRail } from "@/components/shared/recommendations-rail";
+import { InteractiveBanner } from "@/components/home/interactive-banner";
 import { BookOpen, Crown, ArrowRight, Play } from "lucide-react";
 
 // Cache da página por 1 minuto (ISR)
@@ -124,27 +125,7 @@ export default async function Home() {
         </section>
 
         {/* 4. BANNER LOJA (Internal Ad) */}
-        {/* Tailwind v4 fix: bg-linear-to-r */}
-        <section className="relative w-full rounded-2xl overflow-hidden bg-linear-to-r from-[#8A2BE2] to-[#4B0082] py-12 px-6 md:px-16 flex items-center justify-between shadow-[0_0_40px_rgba(138,43,226,0.2)]">
-           <div className="relative z-10 max-w-2xl space-y-4">
-              <Badge className="bg-black text-[#FFD700] border-none font-bold hover:bg-black">PREMIUM</Badge>
-              <h2 className="text-3xl md:text-5xl font-black text-white italic">
-                 DESBLOQUEIE O PODER TOTAL!
-              </h2>
-              <p className="text-zinc-200 text-lg">
-                 Assine o plano <span className="text-[#FFD700] font-bold">Ouro</span> e leia sem limites.
-                 Apoie os criadores e ganhe Patinhas todo mês.
-              </p>
-              <Link href="/shop">
-                 <Button className="bg-[#FFD700] text-black font-bold h-12 px-8 rounded-full hover:scale-105 transition-transform mt-4">
-                    Ir para a Loja
-                 </Button>
-              </Link>
-           </div>
-           
-           {/* Decorative Element */}
-           <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-[url('https://placehold.co/400x400/transparent/FFFFFF?text=Manga')] bg-no-repeat bg-contain bg-right opacity-10 rotate-12" />
-        </section>
+        <InteractiveBanner/>
 
         {/* 5. ÚLTIMAS ATUALIZAÇÕES */}
         <section>

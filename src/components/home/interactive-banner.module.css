@@ -1,0 +1,59 @@
+.banner {
+    position: relative;
+    overflow: hidden;
+    /* Cores do nosso tema */
+    --color-bg: #8A2BE2; /* Roxo Neon */
+    --color-glow: #FFD700; /* Amarelo Ouro */
+    background-color: var(--color-bg);
+}
+
+/* O "spotlight" que segue o mouse */
+.banner::before {
+    content: "";
+    position: absolute;
+    left: var(--x, 50%); /* Posição X do mouse (padrão no centro) */
+    top: var(--y, 50%);  /* Posição Y do mouse (padrão no centro) */
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    /* Gradiente radial que cria o efeito de luz */
+    background-image: radial-gradient(
+        circle,
+        var(--color-glow) 0%,
+        rgba(255, 215, 0, 0.4) 30%, /* Amarelo com transparência */
+        transparent 60%
+    );
+    opacity: 0;
+    transition: opacity 0.5s;
+}
+
+/* Quando o mouse está sobre o banner, o spotlight aparece */
+.banner:hover::before {
+    opacity: 0.2;
+}
+
+/* A grade de pontos (dots) */
+.dots {
+    position: absolute;
+    inset: 0;
+    /* Gradiente que cria o padrão de pontos */
+    background-image: radial-gradient(
+        circle at 1px 1px,
+        rgba(255, 255, 255, 0.1) 1px, /* Cor dos pontos */
+        transparent 0
+    );
+    background-size: 40px 40px; /* Espaçamento entre os pontos */
+    
+    /* Máscara para que os pontos só apareçam onde o spotlight está */
+    mask-image: radial-gradient(
+        circle,
+        white 0%,
+        white 30%,
+        transparent 60%
+    );
+    mask-size: 600px 600px;
+    mask-position: var(--x, 50%) var(--y, 50%);
+    mask-repeat: no-repeat;
+    
+    transition: mask-position 0.2s ease-out;
+}
