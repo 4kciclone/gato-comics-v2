@@ -7,9 +7,20 @@ import { UserActions } from "@/components/admin/users/user-actions";
 import { Coins, Shield } from "lucide-react";
 
 export default async function UsersPage() {
-  const users = await prisma.user.findMany({
+  const usersWithBalances = await prisma.user.findMany({
     orderBy: { createdAt: 'desc' },
-    take: 50, // Limita a 50 para performance
+    take: 50,
+    include: {
+        // Incluímos a relação com LiteCoinBatch para poder calcular o saldo
+        liteCoinBatches: {
+            where: {
+                expiresAt: { gt: new Date() } // Apenas lotes válidos
+            },
+            select: {
+                amount: true
+            }
+        }
+    }
   });
 
   return (
@@ -30,57 +41,58 @@ export default async function UsersPage() {
               <TableRow className="border-zinc-800 hover:bg-[#1A1A1A]">
                 <TableHead className="text-zinc-400">Usuário</TableHead>
                 <TableHead className="text-zinc-400">Cargo</TableHead>
-                <TableHead className="text-zinc-400">Saldo (P/L)</TableHead>
+                <TableHead className="text-zinc-400">Saldo (Premium/Lite)</TableHead>
                 <TableHead className="text-zinc-400">Data de Registro</TableHead>
                 <TableHead className="text-zinc-400 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map(user => (
-                <TableRow key={user.id} className="border-zinc-800">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={user.image || undefined} />
-                        <AvatarFallback className="bg-zinc-800 text-xs">
-                          {user.name?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium text-white">{user.name}</div>
-                        <div className="text-xs text-zinc-500">{user.email}</div>
+              {usersWithBalances.map(user => {
+                // CORREÇÃO: Calculamos o saldo Lite para cada usuário
+                const totalLiteBalance = user.liteCoinBatches.reduce((sum, batch) => sum + batch.amount, 0);
+
+                return (
+                  <TableRow key={user.id} className="border-zinc-800">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={user.image || undefined} />
+                          <AvatarFallback className="bg-zinc-800 text-xs">
+                            {user.name?.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium text-white">{user.name}</div>
+                          <div className="text-xs text-zinc-500">{user.email}</div>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                     <Badge 
-                       variant={user.role === 'ADMIN' || user.role === 'OWNER' ? 'default' : 'secondary'}
-                       className={
-                         user.role === 'OWNER' ? 'bg-yellow-400 text-black' :
-                         user.role === 'ADMIN' ? 'bg-purple-600 text-white' : ''
-                       }
-                     >
-                       <Shield className="w-3 h-3 mr-1"/> {user.role}
-                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="flex items-center gap-1 font-mono text-sm text-[#FFD700]">
-                        <Coins className="w-3 h-3"/> {user.balancePremium}
-                      </span>
-                      <span className="flex items-center gap-1 font-mono text-sm text-zinc-500">
-                        <Coins className="w-3 h-3"/> {user.balanceLite}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-zinc-500 text-xs">
-                    {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                  </TableCell>
-                  <TableCell>
-                    <UserActions user={{ id: user.id, role: user.role }} />
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>
+                       <Badge 
+                         variant={user.role === 'ADMIN' || user.role === 'OWNER' ? 'default' : 'secondary'}
+                         className={ user.role === 'OWNER' ? 'bg-yellow-400 text-black' : user.role === 'ADMIN' ? 'bg-purple-600 text-white' : ''}
+                       ><Shield className="w-3 h-3 mr-1"/> {user.role}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="flex items-center gap-1 font-mono text-sm text-[#FFD700]">
+                          <Coins className="w-3 h-3"/> {user.balancePremium}
+                        </span>
+                        {/* CORREÇÃO: Usamos o saldo Lite calculado */}
+                        <span className="flex items-center gap-1 font-mono text-sm text-zinc-500">
+                          <Coins className="w-3 h-3"/> {totalLiteBalance}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-zinc-500 text-xs">
+                      {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell>
+                      <UserActions user={{ id: user.id, role: user.role }} />
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>
