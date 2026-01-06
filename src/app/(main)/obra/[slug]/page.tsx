@@ -147,13 +147,13 @@ export default async function WorkPage({ params }: Props) {
             <main className="lg:col-span-8">
                <ChapterList chapters={chaptersWithUserStatus as any} workSlug={work.slug} lastReadChapterId={userHistory?.lastReadChapterId}/>
             </main>
-         </div>
+         </div>      
+         <RecommendationsRail workId={work.id} userId={session?.user?.id} />
          <section id="comments">
            <CommentSection workId={work.id} />
          </section>
       </div>
       
-      <RecommendationsRail workId={work.id} userId={session?.user?.id} />
     </div>
   );
 }
