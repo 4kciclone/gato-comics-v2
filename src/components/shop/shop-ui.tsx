@@ -206,6 +206,111 @@ function ListItem({
   );
 }
 
+// --- CARD DE ASSINATURA ---
+interface SubCardProps {
+  label: string;
+  price: number;
+  monthlyPaws: number;
+  discount: number;
+  works: number;
+  recommended?: boolean;
+  subId: string;
+  icon?: "sparkles" | "crown" | "diamond";
+  action: (formData: FormData) => void;
+}
+
+export function SubscriptionCard({
+  label,
+  price,
+  monthlyPaws,
+  discount,
+  works,
+  recommended,
+  subId,
+  icon,
+  action,
+}: SubCardProps) {
+  let Icon = Zap;
+  let iconColor = "text-orange-500";
+
+  if (icon === "sparkles") {
+    Icon = Sparkles;
+    iconColor = "text-zinc-300";
+  }
+  if (icon === "crown") {
+    Icon = Crown;
+    iconColor = "text-yellow-400";
+  }
+  if (icon === "diamond") {
+    Icon = Gem;
+    iconColor = "text-cyan-400";
+  }
+
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col rounded-2xl transition-all duration-300",
+        recommended
+          ? "border-2 border-[#FFD700] bg-[#0f0f0f] scale-105 z-10 shadow-[0_0_40px_rgba(255,215,0,0.15)]"
+          : "border border-zinc-800 bg-[#0a0a0a] hover:border-zinc-600"
+      )}
+    >
+      {recommended && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FFD700] text-black text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1">
+          <Crown className="w-3 h-3" /> Recomendado
+        </div>
+      )}
+
+      <div className="p-8 flex flex-col h-full">
+        <div className="flex items-center gap-4 mb-6 pt-2">
+          <div className={cn("p-3 rounded-lg bg-zinc-900", iconColor)}>
+            <Icon className="w-6 h-6" />
+          </div>
+          <h3 className="text-xl font-bold text-white uppercase tracking-wider">
+            {label}
+          </h3>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex items-baseline gap-1">
+            <span className="text-zinc-500 text-lg">R$</span>
+            <span className="text-5xl font-black text-white">
+              {Math.floor(price / 100)}
+            </span>
+            <span className="text-zinc-500">
+              ,{(price % 100).toString().padStart(2, "0")}
+            </span>
+            <span className="text-zinc-500 ml-1">/mês</span>
+          </div>
+          <p className="text-xs text-zinc-500 mt-2">
+            Cancele quando quiser.
+          </p>
+        </div>
+
+        <ul className="space-y-4 mb-8 flex-1">
+          <ListItem text="Sem anúncios" highlighted />
+          <ListItem text={`${works} obras à escolha`} />
+          <ListItem
+            text={`${monthlyPaws} Patinhas Lite mensais`}
+            highlightText
+          />
+          <ListItem text={`${discount}% de desconto na loja`} />
+          <ListItem
+            text="Acesso antecipado a capítulos"
+            icon={<Star className="w-4 h-4 text-yellow-500" />}
+          />
+        </ul>
+
+        <form action={action}>
+          <input type="hidden" name="subId" value={subId} />
+          <ShopButton price={price} isSub highlight={recommended} />
+        </form>
+      </div>
+    </div>
+  );
+}
+
+
 // --- TABS ---
 export function ShopTabs({
   childrenPacks,
