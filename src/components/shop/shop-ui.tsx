@@ -272,10 +272,6 @@ export function SubscriptionCard({
             highlightText
           />
           <ListItem text={`${discount}% de desconto na loja`} />
-          <ListItem
-            text="Acesso antecipado a capítulos"
-            icon={<Star className="w-4 h-4 text-yellow-500" />}
-          />
         </ul>
 
         <form action={action}>
