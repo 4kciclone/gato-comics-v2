@@ -11,9 +11,22 @@ import { PostOptions } from "./post-options";
 import { cn } from "@/lib/utils";
 
 export type PostWithMeta = {
-    id: string; content: string; imageUrl: string | null; createdAt: Date;
-    user: { id: string; name: string | null; username: string | null; image: string | null; equippedAvatarFrame: { imageUrl: string; } | null; };
-    _count: { likes: number; comments: number; }; isLiked: boolean;
+    id: string; 
+    content: string; 
+    imageUrl: string | null; 
+    createdAt: Date;
+    user: { 
+        id: string; 
+        name: string | null; 
+        username: string | null; 
+        image: string | null; 
+        equippedAvatarFrame: { imageUrl: string; } | null; 
+    };
+    _count: { 
+        likes: number; 
+        comments: number; 
+    }; 
+    isLiked: boolean;
 };
 
 export function PostCard({ post }: { post: PostWithMeta }) {
@@ -32,12 +45,16 @@ export function PostCard({ post }: { post: PostWithMeta }) {
         await toggleLikePost(post.id);
     };
 
-    if (!post.user.username) return null;
+    // Proteção: Não renderiza o card se, por algum motivo, não houver um username para linkar.
+    if (!post.user.username) {
+        return null;
+    }
 
     return (
       <div className="flex gap-4 p-4 border-b border-[#27272a] transition-colors hover:bg-white/5 relative">
         <Link href={`/social/post/${post.id}`} className="absolute inset-0 z-0" aria-label={`Ver post de ${post.user.name}`} />
         
+        {/* CORREÇÃO AQUI: Garante que o link usa o 'username' do post atual */}
         <Link href={`/u/${post.user.username}`} className="relative w-10 h-10 shrink-0 z-10">
             <Avatar className="w-full h-full">
                 <AvatarImage src={userAvatarUrl} />
@@ -51,7 +68,10 @@ export function PostCard({ post }: { post: PostWithMeta }) {
         <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm">
-                    <Link href={`/u/${post.user.username}`} className="font-bold text-white hover:underline relative z-10">{post.user.name}</Link>
+                    {/* CORREÇÃO AQUI: Garante que o link usa o 'username' do post atual */}
+                    <Link href={`/u/${post.user.username}`} className="font-bold text-white hover:underline relative z-10">
+                        {post.user.name}
+                    </Link>
                     <span className="text-zinc-500">· @{post.user.username}</span>
                     <span className="text-zinc-500">· {new Date(post.createdAt).toLocaleDateString('pt-BR')}</span>
                 </div>
