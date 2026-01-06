@@ -101,7 +101,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
     recommended: true,
   },
   sub_platinum: {
-    label: "Rei Platina",
+    label: "Diamante",
     price: 3599,
     monthlyPaws: 30,
     discount: 15,

@@ -2,8 +2,7 @@
 
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookOpen, Gem, BarChart2, History, Settings } from "lucide-react";
-import { motion } from "framer-motion"; // Se instalou
-import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 const tabs = [
     { value: "library", label: "Biblioteca", icon: BookOpen },
@@ -13,20 +12,20 @@ const tabs = [
     { value: "settings", label: "Configurações", icon: Settings, disabled: true },
 ];
 
-export function ProfileTabs() {
-    const [activeTab, setActiveTab] = useState("library");
-
+export function ProfileTabs({ defaultValue }: { defaultValue: string }) {
     return (
-        <div className="relative overflow-x-auto scrollbar-hide mb-8">
-            {/* Usamos 'inline-flex' para que o container tenha a largura do conteúdo */}
-            <TabsList className="relative inline-flex items-center justify-start bg-[#111111] border border-[#27272a] h-14 p-1 rounded-full">
+        <div className="relative overflow-x-auto scrollbar-hide mb-8 flex justify-center sm:justify-start">
+            <TabsList className="inline-flex h-auto bg-transparent p-0">
                 {tabs.map((tab) => (
-                    <TabsTrigger 
+                    <TabsTrigger
                         key={tab.value}
                         value={tab.value}
                         disabled={tab.disabled}
-                        onClick={() => setActiveTab(tab.value)}
-                        className="relative h-full px-6 rounded-full data-[state=active]:text-black text-zinc-400 font-bold text-sm transition-colors duration-300 hover:text-white"
+                        className={cn(
+                            "relative h-12 px-5 rounded-full text-zinc-400 font-bold text-sm transition-colors duration-300",
+                            "hover:text-white data-[state=active]:bg-zinc-800 data-[state=active]:text-white",
+                            "disabled:cursor-not-allowed disabled:opacity-50"
+                        )}
                     >
                         <tab.icon className="w-4 h-4 mr-2" />
                         {tab.label}

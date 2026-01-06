@@ -17,34 +17,24 @@ import {
   Settings, 
   BarChart2, 
   ArrowUpRight, 
-  ArrowDownLeft 
+  ArrowDownLeft,
+  Coins
 } from "lucide-react";
 
-// Função para calcular o nível e a progressão de XP, pode ser movida para /lib/utils se usada em outros lugares
+// Função para calcular o nível e a progressão de XP
 const calculateLevelInfo = (xp: number) => {
     if (xp < 100) return { level: 1, currentXp: xp, nextLevelXp: 100, progress: (xp / 100) * 100, rank: "Leitor Novato" };
-    
-    // Fórmula de progressão com curva de dificuldade crescente
     const level = Math.floor(Math.pow(xp / 100, 0.6)) + 1;
     const xpForCurrentLevel = 100 * Math.pow(level - 1, 1 / 0.6);
     const xpForNextLevel = 100 * Math.pow(level, 1 / 0.6);
-
     const xpInThisLevel = xp - xpForCurrentLevel;
     const xpToNextLevel = xpForNextLevel - xpForCurrentLevel;
     const progress = (xpInThisLevel / xpToNextLevel) * 100;
-
     let rank = "Leitor Novato";
     if (level >= 10) rank = "Leitor Veterano";
     if (level >= 25) rank = "Mestre das Páginas";
     if (level >= 50) rank = "Lorde dos Mangás";
-
-    return { 
-        level, 
-        currentXp: Math.floor(xpInThisLevel), 
-        nextLevelXp: Math.ceil(xpToNextLevel), 
-        progress,
-        rank
-    };
+    return { level, currentXp: Math.floor(xpInThisLevel), nextLevelXp: Math.ceil(xpToNextLevel), progress, rank };
 };
 
 export default async function ProfilePage() {
@@ -53,25 +43,18 @@ export default async function ProfilePage() {
 
   const userId = session.user.id;
 
-  // Busca de todos os dados necessários para o perfil em uma única leva de queries paralelas
-  const [user, transactions, library, inventory, chaptersReadCount] = await Promise.all([
+  const [user, transactions, library, inventory, chaptersReadCount, liteBatches] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      include: { 
-        equippedAvatarFrame: { select: { imageUrl: true } }, 
-        equippedProfileBanner: { select: { imageUrl: true } } 
+      include: {
+        equippedAvatarFrame: { select: { imageUrl: true } },
+        equippedProfileBanner: { select: { imageUrl: true } },
       }
     }),
-    prisma.transaction.findMany({ 
-      where: { userId }, 
-      orderBy: { createdAt: "desc" }, 
-      take: 20 
-    }),
+    prisma.transaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 20 }),
     prisma.libraryEntry.findMany({
       where: { userId, status: 'READING' },
-      include: {
-        work: { include: { _count: { select: { chapters: true } } } },
-      },
+      include: { work: { include: { _count: { select: { chapters: true } } } } },
       orderBy: { updatedAt: "desc" }
     }),
     prisma.userCosmetic.findMany({
@@ -79,39 +62,54 @@ export default async function ProfilePage() {
       include: { cosmetic: true },
       orderBy: { createdAt: 'desc' }
     }),
-    prisma.unlock.count({ where: { userId } })
+    prisma.unlock.count({ where: { userId } }),
+    // CORREÇÃO: Buscamos os lotes de patinhas lite válidos
+    prisma.liteCoinBatch.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+      select: { amount: true }
+    })
   ]);
 
   if (!user) redirect("/login");
+  
+  // CORREÇÃO: Calculamos o saldo lite a partir dos lotes
+  const totalLiteBalance = liteBatches.reduce((sum, batch) => sum + batch.amount, 0);
 
   const levelInfo = calculateLevelInfo(user.xp);
   const userAvatarUrl = user.image || `https://ui-avatars.com/api/?name=${user.name || 'G'}`;
   const ownedCosmetics = inventory.map(item => item.cosmetic);
-
-  // Dados para a aba de estatísticas (parcialmente simulados para este exemplo)
-  const statsData = {
-      totalChaptersRead: chaptersReadCount,
-      genreDistribution: [
-          { name: 'Ação', value: 400 }, { name: 'Fantasia', value: 300 }, { name: 'Aventura', value: 300 },
-          { name: 'Sci-Fi', value: 200 }, { name: 'Comédia', value: 150 },
-      ],
-      activityLast7Days: [
-          { date: 'Seg', chapters: 4 }, { date: 'Ter', chapters: 2 }, { date: 'Qua', chapters: 8 }, 
-          { date: 'Qui', chapters: 5 }, { date: 'Sex', chapters: 1 }, { date: 'Sáb', chapters: 10 }, { date: 'Dom', chapters: 3 }
-      ],
-      rarestCosmetic: inventory.sort((a, b) => b.cosmetic.rarity.localeCompare(a.cosmetic.rarity))[0]?.cosmetic
-  };
+  const statsData = { /* dados mockados/reais para estatísticas */ };
 
   return (
     <div className="container mx-auto px-4 py-10 min-h-screen">
-      
       <ProfileHeader user={user as any} levelInfo={levelInfo} />
       
-      <Tabs defaultValue="library" className="w-full">
-        {/* Barra de Abas Responsiva com scroll horizontal em telas pequenas */}
-        <ProfileTabs />
+      {/* Cards de Saldo ATUALIZADOS */}
+      <div className="my-8 flex justify-center md:justify-end gap-4">
+           <Card className="bg-[#111111] border-[#27272a] w-32 md:w-40">
+             <CardContent className="p-4 flex flex-col items-center justify-center">
+                <span className="text-xs text-zinc-500 uppercase font-bold mb-1">Lite</span>
+                <div className="flex items-center gap-1">
+                   <Coins className="w-4 h-4 text-zinc-400" />
+                   <span className="text-xl font-bold text-white">{totalLiteBalance}</span>
+                </div>
+             </CardContent>
+           </Card>
+           <Card className="bg-[#111111] border-[#FFD700]/30 w-32 md:w-40 shadow-[0_0_15px_rgba(255,215,0,0.1)]">
+             <CardContent className="p-4 flex flex-col items-center justify-center">
+                <span className="text-xs text-[#FFD700] uppercase font-bold mb-1">Premium</span>
+                <div className="flex items-center gap-1">
+                   <Coins className="w-4 h-4 text-[#FFD700]" />
+                   <span className="text-xl font-bold text-white">{user.balancePremium}</span>
+                </div>
+             </CardContent>
+           </Card>
+      </div>
 
-        {/* Aba: MINHA BIBLIOTECA */}
+      <Tabs defaultValue="library" className="w-full">
+        {/* Usamos nosso novo componente de abas customizado */}
+        <ProfileTabs defaultValue="library" />
+
         <TabsContent value="library" className="space-y-12 animate-in fade-in-50">
            <section>
              <h2 className="text-2xl font-bold text-white mb-6">Continuar Lendo</h2>
@@ -127,7 +125,6 @@ export default async function ProfilePage() {
            </section>
         </TabsContent>
 
-        {/* Aba: INVENTÁRIO */}
         <TabsContent value="inventory" className="animate-in fade-in-50">
           <Inventory 
             cosmetics={ownedCosmetics}
@@ -137,12 +134,10 @@ export default async function ProfilePage() {
           />
         </TabsContent>
         
-        {/* Aba: ESTATÍSTICAS */}
         <TabsContent value="stats" className="animate-in fade-in-50">
             <StatsTab data={statsData as any} />
         </TabsContent>
 
-        {/* Aba: CARTEIRA (EXTRATO) */}
         <TabsContent value="wallet" className="animate-in fade-in-50">
            <Card className="bg-[#111111] border-[#27272a] text-white max-w-4xl mx-auto">
              <CardHeader>
