@@ -27,20 +27,29 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   let username: string | null = null;
 
   if (session?.user?.id) {
-    const [dbUser, unreadNotifications] = await Promise.all([
+    const userId = session.user.id;
+    const [dbUser, liteBatches, unreadNotifications] = await Promise.all([
       prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { username: true, balancePremium: true, balanceLite: true }
+        where: { id: userId },
+        select: { username: true, balancePremium: true }
+      }),
+      // Busca todos os lotes de Patinhas Lite que ainda não expiraram
+      prisma.liteCoinBatch.findMany({ 
+        where: { userId, expiresAt: { gt: new Date() } },
+        select: { amount: true }
       }),
       prisma.notification.findMany({
-          where: { userId: session.user.id, isRead: false },
+          where: { userId: userId, isRead: false },
           orderBy: { createdAt: 'desc' }, take: 10,
           include: { originUser: { select: { name: true } } }
       })
     ]);
+    
     if (dbUser) {
       username = dbUser.username;
-      userBalance = { premium: dbUser.balancePremium, lite: dbUser.balanceLite };
+      // Soma o valor de todos os lotes de Lite válidos para obter o saldo total
+      const totalLite = liteBatches.reduce((sum, batch) => sum + batch.amount, 0);
+      userBalance = { premium: dbUser.balancePremium, lite: totalLite };
     }
     notifications = unreadNotifications;
   }
@@ -54,7 +63,6 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         <div className="container mx-auto px-4 h-full flex items-center justify-between relative z-10">
           <div className="flex items-center gap-6">
             <div className="md:hidden">
-              {/* CORREÇÃO: Passando a prop 'isLoggedIn' */}
               <MobileDrawer username={username} isLoggedIn={!!session?.user} />
             </div>
             <Link href="/" className="hidden md:block">

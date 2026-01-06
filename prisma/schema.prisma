@@ -66,7 +66,7 @@ model User {
   password                  String?
   role                      UserRole      @default(USER)
   balancePremium            Int           @default(0)
-  balanceLite               Int           @default(0)
+  liteCoinBatches LiteCoinBatch[]
   xp                        Int           @default(0)
   mutedUntil                DateTime?
   equippedAvatarFrameId     String?
@@ -320,4 +320,17 @@ model WorkLike {
   work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
   @@id([userId, workId])
   @@map("work_likes")
+}
+
+model LiteCoinBatch {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int      // Quantidade de Patinhas Lite neste lote
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Data em que este lote expira (ex: createdAt + 7 dias)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, expiresAt])
+  @@map("lite_coin_batches")
 }
