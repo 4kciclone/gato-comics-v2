@@ -4,16 +4,15 @@ import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CommentForm } from "./comment-form";
+import { ReportButton } from "./report-button";
 import { MessageSquare, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CommentWithUser } from "./comment-section";
-import { ReportButton } from "./report-button";
 
 export function CommentItem({ comment, workId, postId }: { comment: CommentWithUser, workId?: string, postId?: string }) {
   const [isReplying, setIsReplying] = useState(false);
   const [isSpoilerVisible, setIsSpoilerVisible] = useState(false);
 
-  // Agora 'user' e suas propriedades existem com certeza
   const userAvatarUrl = comment.user.image || `https://ui-avatars.com/api/?name=${comment.user.name || 'G'}&background=111111&color=FFD700`;
   const frameUrl = comment.user.equippedAvatarFrame?.imageUrl;
   const backgroundUrl = comment.user.equippedCommentBackground?.imageUrl;
@@ -51,18 +50,21 @@ export function CommentItem({ comment, workId, postId }: { comment: CommentWithU
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-2">
               <span className="font-bold text-white text-sm">{comment.user.name}</span>
+              {/* CORREÇÃO: Formatação da data para string */}
               <span className="text-xs text-zinc-500">{new Date(comment.createdAt).toLocaleDateString('pt-BR')}</span>
             </div>
             {content}
           </div>
         </div>
 
-        <div className="mt-2 flex items-center gap-4">
-          <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white" onClick={() => setIsReplying(!isReplying)}>
-            <MessageSquare className="w-3 h-3 mr-2" /> Responder
-          </Button>
+        <div className="mt-2 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white" onClick={() => setIsReplying(!isReplying)}>
+              <MessageSquare className="w-3 h-3 mr-2" /> Responder
+            </Button>
+          </div>
+          <ReportButton commentId={comment.id} />
         </div>
-        <ReportButton commentId={comment.id} />
 
         {isReplying && (
           <div className="mt-4">

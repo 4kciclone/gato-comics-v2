@@ -6,10 +6,9 @@ import { PostCard, type PostWithMeta } from "@/components/social/post-card";
 import { FollowButton } from "@/components/profile/follow-button";
 import { Calendar, MapPin } from "lucide-react";
 import { Prisma } from "@prisma/client";
-export const dynamic = 'force-dynamic';
 
 interface ProfilePageProps {
-  params: { username: string }; // Parâmetro já decodificado
+  params: { username: string };
 }
 
 export default async function UserProfilePage({ params }: ProfilePageProps) {
@@ -17,7 +16,6 @@ export default async function UserProfilePage({ params }: ProfilePageProps) {
   const session = await auth();
   const sessionUserId = session?.user?.id;
 
-  // CORREÇÃO: Usamos 'findFirst' com 'mode: "insensitive"' para ignorar maiúsculas/minúsculas
   const user = await prisma.user.findFirst({
     where: { 
         username: {
@@ -100,7 +98,11 @@ export default async function UserProfilePage({ params }: ProfilePageProps) {
           
           <div className="flex items-center gap-6 text-sm text-zinc-500">
             <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> Brasil</div>
-            <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Entrou em {new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</div>
+            <div className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4" /> 
+                {/* CORREÇÃO: Formatação da data para string */}
+                Entrou em {new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            </div>
           </div>
 
           <div className="flex items-center gap-4 text-sm">
