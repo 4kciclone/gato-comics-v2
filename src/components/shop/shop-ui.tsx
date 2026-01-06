@@ -1,13 +1,30 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Check, Gem, Zap, Sparkles, Crown, Coins, Star, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { formatCurrency, cn } from "@/lib/utils";
-import { useFormStatus } from "react-dom";
+import {
+  useState,
+  useRef,
+  useEffect,
+  forwardRef,
+  type ReactNode,
+} from "react";
+import {
+  Check,
+  Gem,
+  Zap,
+  Sparkles,
+  Crown,
+  Coins,
+  Star,
+  Loader2,
+} from "lucide-react";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { cn, formatCurrency } from "@/lib/utils";
+import { useFormStatus } from "react-dom";
 
-// --- BOTÃO DE COMPRA / ASSINATURA ---
+/* =========================================================
+ * SHOP BUTTON
+ * =======================================================*/
 export function ShopButton({
   price,
   isSub = false,
@@ -46,13 +63,15 @@ export function ShopButton({
   );
 }
 
-// --- CARD DE PACOTE ---
+/* =========================================================
+ * PACK CARD
+ * =======================================================*/
 interface PackCardProps {
   label: string;
   premium: number;
   lite: number;
   price: number;
-  icon: string;
+  icon: "bronze" | "silver" | "gold" | "diamond" | "legendary";
   popular?: boolean;
   legendary?: boolean;
   packId: string;
@@ -70,8 +89,8 @@ export function PackCard({
   packId,
   action,
 }: PackCardProps) {
-  let glowColor = "group-hover:shadow-zinc-500/20";
   let iconColor = "text-zinc-400";
+  let glowColor = "group-hover:shadow-zinc-500/20";
   let borderColor = "border-zinc-800";
   let bgGradient = "from-[#111] to-[#0a0a0a]";
 
@@ -86,15 +105,11 @@ export function PackCard({
     iconColor = "text-cyan-400";
     glowColor = "group-hover:shadow-cyan-500/30";
   }
-  if (popular) {
-    borderColor = "border-[#FFD700]";
-    glowColor = "shadow-yellow-500/20 group-hover:shadow-yellow-500/40";
-  }
-  if (legendary) {
-    borderColor = "border-purple-500";
-    glowColor = "shadow-purple-500/30 group-hover:shadow-purple-500/50";
-    bgGradient = "from-[#1a0b2e] to-[#0a0a0a]";
+  if (legendary || icon === "legendary") {
     iconColor = "text-purple-400";
+    glowColor = "shadow-purple-500/30 group-hover:shadow-purple-500/50";
+    borderColor = "border-purple-500";
+    bgGradient = "from-[#1a0b2e] to-[#0a0a0a]";
   }
 
   return (
@@ -110,6 +125,7 @@ export function PackCard({
           glowColor
         )}
       />
+
       <div
         className={cn(
           "relative flex flex-col h-full rounded-xl border bg-linear-to-b p-6 overflow-hidden",
@@ -122,6 +138,7 @@ export function PackCard({
             Best Seller
           </div>
         )}
+
         {legendary && (
           <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest">
             Lendário
@@ -131,29 +148,23 @@ export function PackCard({
         <div className="flex justify-center mb-6 mt-2">
           <div
             className={cn(
-              "p-4 rounded-full bg-white/5 backdrop-blur-sm ring-1 ring-white/10 relative",
+              "p-4 rounded-full bg-white/5 ring-1 ring-white/10 relative",
               iconColor
             )}
           >
             <Gem className="w-8 h-8" />
-            <div
-              className={cn(
-                "absolute inset-0 blur-xl opacity-50",
-                iconColor === "text-yellow-400"
-                  ? "bg-yellow-500"
-                  : "bg-white"
-              )}
-            />
+            <div className={cn("absolute inset-0 blur-xl opacity-40", iconColor)} />
           </div>
         </div>
 
         <div className="text-center space-y-1 mb-8">
-          <h3 className="text-zinc-400 font-medium uppercase tracking-widest text-xs">
+          <h3 className="text-zinc-400 uppercase tracking-widest text-xs">
             {label}
           </h3>
-          <div className="text-4xl font-black text-white flex items-center justify-center gap-2">
+          <div className="text-4xl font-black text-white flex justify-center gap-2">
             {premium} <Coins className="w-6 h-6 text-[#FFD700]" />
           </div>
+
           {lite > 0 && (
             <div className="inline-flex items-center gap-1 bg-green-900/30 text-green-400 px-2 py-0.5 rounded text-xs font-bold border border-green-900/50">
               <Sparkles className="w-3 h-3" /> +{lite} Bônus Lite
@@ -170,52 +181,18 @@ export function PackCard({
   );
 }
 
-// --- LIST ITEM ---
-function ListItem({
-  text,
-  highlighted,
-  highlightText,
-  icon,
-}: {
-  text: string;
-  highlighted?: boolean;
-  highlightText?: boolean;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <li
-      className={cn(
-        "flex items-center gap-3 text-sm",
-        highlighted ? "text-white" : "text-zinc-400"
-      )}
-    >
-      <div
-        className={cn(
-          "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-          highlightText
-            ? "bg-[#FFD700]/20 text-[#FFD700]"
-            : "bg-zinc-800 text-zinc-400"
-        )}
-      >
-        {icon || <Check className="w-3 h-3" />}
-      </div>
-      <span className={highlightText ? "text-[#FFD700] font-bold" : ""}>
-        {text}
-      </span>
-    </li>
-  );
-}
-
-// --- CARD DE ASSINATURA ---
+/* =========================================================
+ * SUBSCRIPTION CARD
+ * =======================================================*/
 interface SubCardProps {
   label: string;
   price: number;
   monthlyPaws: number;
   discount: number;
   works: number;
+  icon?: "zap" | "sparkles" | "crown" | "diamond";
   recommended?: boolean;
   subId: string;
-  icon?: "sparkles" | "crown" | "diamond";
   action: (formData: FormData) => void;
 }
 
@@ -225,9 +202,9 @@ export function SubscriptionCard({
   monthlyPaws,
   discount,
   works,
+  icon,
   recommended,
   subId,
-  icon,
   action,
 }: SubCardProps) {
   let Icon = Zap;
@@ -310,8 +287,47 @@ export function SubscriptionCard({
   );
 }
 
+/* =========================================================
+ * LIST ITEM
+ * =======================================================*/
+function ListItem({
+  text,
+  highlighted,
+  highlightText,
+  icon,
+}: {
+  text: string;
+  highlighted?: boolean;
+  highlightText?: boolean;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <li
+      className={cn(
+        "flex items-center gap-3 text-sm",
+        highlighted ? "text-white" : "text-zinc-400"
+      )}
+    >
+      <div
+        className={cn(
+          "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+          highlightText
+            ? "bg-[#FFD700]/20 text-[#FFD700]"
+            : "bg-zinc-800 text-zinc-400"
+        )}
+      >
+        {icon || <Check className="w-3 h-3" />}
+      </div>
+      <span className={highlightText ? "text-[#FFD700] font-bold" : ""}>
+        {text}
+      </span>
+    </li>
+  );
+}
 
-// --- TABS ---
+/* =========================================================
+ * SHOP TABS
+ * =======================================================*/
 export function ShopTabs({
   childrenPacks,
   childrenSubs,
@@ -321,9 +337,9 @@ export function ShopTabs({
   childrenSubs: React.ReactNode;
   childrenCosmetics: React.ReactNode;
 }) {
-  const [activeTab, setActiveTab] = useState<"packs" | "subs" | "cosmetics">(
-    "packs"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "packs" | "subs" | "cosmetics"
+  >("packs");
 
   const packsRef = useRef<HTMLButtonElement>(null);
   const subsRef = useRef<HTMLButtonElement>(null);
@@ -336,20 +352,18 @@ export function ShopTabs({
   });
 
   useEffect(() => {
-    const targetRef =
+    const ref =
       activeTab === "packs"
         ? packsRef
         : activeTab === "subs"
         ? subsRef
         : cosmeticsRef;
 
-    if (!targetRef.current) return;
-
-    const el = targetRef.current;
+    if (!ref.current) return;
 
     setSliderStyle({
-      left: el.offsetLeft,
-      width: el.offsetWidth,
+      left: ref.current.offsetLeft,
+      width: ref.current.offsetWidth,
       opacity: 1,
     });
   }, [activeTab]);
@@ -357,51 +371,34 @@ export function ShopTabs({
   return (
     <div className="space-y-12">
       <div className="flex justify-center">
-        <div className="relative inline-flex items-center bg-[#111111] border border-[#27272a] h-14 p-1 rounded-full">
+        <div className="relative inline-flex items-center bg-[#111] border border-[#27272a] h-14 p-1 rounded-full">
           <motion.div
             className="absolute h-[calc(100%-0.5rem)] bg-[#FFD700] rounded-full z-0"
             animate={sliderStyle}
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
           />
 
-          <button
+          <TabButton
             ref={packsRef}
+            active={activeTab === "packs"}
             onClick={() => setActiveTab("packs")}
-            className={cn(
-              "relative z-10 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2",
-              activeTab === "packs"
-                ? "text-black"
-                : "text-zinc-400 hover:text-white"
-            )}
-          >
-            <Coins className="w-4 h-4" /> Pacotes
-          </button>
-
-          <button
+            icon={<Coins className="w-4 h-4" />}
+            label="Pacotes"
+          />
+          <TabButton
             ref={subsRef}
+            active={activeTab === "subs"}
             onClick={() => setActiveTab("subs")}
-            className={cn(
-              "relative z-10 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2",
-              activeTab === "subs"
-                ? "text-black"
-                : "text-zinc-400 hover:text-white"
-            )}
-          >
-            <Crown className="w-4 h-4" /> Assinaturas
-          </button>
-
-          <button
+            icon={<Crown className="w-4 h-4" />}
+            label="Assinaturas"
+          />
+          <TabButton
             ref={cosmeticsRef}
+            active={activeTab === "cosmetics"}
             onClick={() => setActiveTab("cosmetics")}
-            className={cn(
-              "relative z-10 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2",
-              activeTab === "cosmetics"
-                ? "text-black"
-                : "text-zinc-400 hover:text-white"
-            )}
-          >
-            <Gem className="w-4 h-4" /> Cosméticos
-          </button>
+            icon={<Gem className="w-4 h-4" />}
+            label="Cosméticos"
+          />
         </div>
       </div>
 
@@ -425,3 +422,30 @@ export function ShopTabs({
     </div>
   );
 }
+
+/* =========================================================
+ * TAB BUTTON
+ * =======================================================*/
+const TabButton = forwardRef<
+  HTMLButtonElement,
+  {
+    active: boolean;
+    onClick: () => void;
+    icon: ReactNode;
+    label: string;
+  }
+>(function TabButton({ active, onClick, icon, label }, ref) {
+  return (
+    <button
+      ref={ref}
+      onClick={onClick}
+      className={cn(
+        "relative z-10 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-colors",
+        active ? "text-black" : "text-zinc-400 hover:text-white"
+      )}
+    >
+      {icon} {label}
+    </button>
+  );
+});
+
