@@ -1,42 +1,33 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { CanvasImage } from "./canvas-image";
+import { useInView } from "react-intersection-observer"; // Para lazy loading
 
-interface WebtoonViewerProps {
-  images: string[];
+export function WebtoonViewer({ images }: { images: string[] }) {
+  return (
+    <div className="max-w-3xl mx-auto bg-black shadow-2xl space-y-0">
+      {images.map((url, index) => (
+        // Lazy-loading: cada imagem só renderiza quando entra na tela
+        <LazyCanvasImage key={index} src={url} alt={`Página ${index + 1}`} index={index} />
+      ))}
+      <div className="h-32 flex items-center justify-center text-zinc-600">Fim do Capítulo</div>
+    </div>
+  );
 }
 
-export function WebtoonViewer({ images }: WebtoonViewerProps) {
-  // Otimização: Lazy loading nativo do navegador já ajuda muito
-  
-  if (images.length === 0) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-zinc-500">
-         <p>Nenhuma imagem disponível.</p>
-      </div>
-    );
-  }
+// Componente Wrapper para carregar as imagens sob demanda
+function LazyCanvasImage(props: { src: string; alt: string; index: number; }) {
+  const { ref, inView } = useInView({
+    triggerOnce: true, // Renderiza apenas uma vez
+    rootMargin: '200px 0px', // Carrega a imagem 200px antes de ela entrar na tela
+  });
 
   return (
-    <div className="max-w-3xl mx-auto bg-black min-h-screen shadow-2xl">
-      {images.map((url, index) => (
-        <div key={index} className="relative w-full">
-           {/* eslint-disable-next-line @next/next/no-img-element */}
-           <img
-             src={url}
-             alt={`Página ${index + 1}`}
-             className="w-full h-auto block select-none"
-             loading={index < 3 ? "eager" : "lazy"} // Carrega as 3 primeiras rápido, o resto sob demanda
-             onContextMenu={(e) => e.preventDefault()} // Dificulta "Salvar Como"
-           />
-        </div>
-      ))}
-      
-      <div className="h-32 flex items-center justify-center text-zinc-600 bg-[#050505]">
-        <p>Fim do Capítulo</p>
-      </div>
+    <div ref={ref}>
+      {inView ? <CanvasImage {...props} /> : (
+        // Placeholder para manter o espaço e evitar pulos de layout
+        <div className="w-full aspect-[2/3] min-h-64 bg-zinc-900 animate-pulse" />
+      )}
     </div>
   );
 }
