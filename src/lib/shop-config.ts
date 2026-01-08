@@ -26,6 +26,7 @@ export interface SubscriptionPlan {
   label: string;
   price: number;
   monthlyPaws: number;
+  priceId: string;
   discount: number;
   works: number;
   icon: SubscriptionIcon;
@@ -77,6 +78,7 @@ export const COIN_PACKS: Record<string, CoinPack> = {
 export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
   sub_bronze: {
     label: "Bronze",
+    priceId: "price_1Sn7jzI2ktaLUyE9ApQIxpPL",
     price: 699,
     monthlyPaws: 10,
     discount: 5,
@@ -85,6 +87,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
   },
   sub_silver: {
     label: "Prata",
+    priceId: "price_1Sn7kXI2ktaLUyE9jAeIZgk5",
     price: 1499,
     monthlyPaws: 15,
     discount: 8,
@@ -93,6 +96,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
   },
   sub_gold: {
     label: "Ouro",
+    priceId: "price_1Sn7kvI2ktaLUyE9eQ9xS4g9",
     price: 2599,
     monthlyPaws: 20,
     discount: 10,
@@ -102,6 +106,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
   },
   sub_platinum: {
     label: "Diamante",
+    priceId: "price_1Sn7lSI2ktaLUyE9exSkWBSb",
     price: 3599,
     monthlyPaws: 30,
     discount: 15,

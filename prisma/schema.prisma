@@ -53,6 +53,13 @@ enum ReportStatus {
   RESOLVED
 }
 
+enum SubscriptionTier { 
+  BRONZE 
+  SILVER 
+  GOLD 
+  DIAMOND 
+  }
+
 // --------------------------------------------------------
 // MODELOS DE USUÁRIO & ECONOMIA
 // --------------------------------------------------------
@@ -94,6 +101,15 @@ model User {
   originNotifications       Notification[] @relation("OriginNotifications")
   workLikes                 WorkLike[]
 
+  workEntitlements          WorkEntitlement[]
+
+  // CAMPOS DE ASSINATURA
+  stripeCustomerId          String?     @unique // ID do cliente no Stripe
+  subscriptionTier          SubscriptionTier?
+  subscriptionId            String?     @unique // ID da assinatura no Stripe
+  subscriptionValidUntil    DateTime?
+  entitlementChangeUntil    DateTime?   // Data limite para trocar as obras vinculadas
+
   @@map("users")
 }
 
@@ -110,6 +126,19 @@ model Transaction {
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId])
   @@map("transactions")
+}
+
+model WorkEntitlement {
+  id        String   @id @default(cuid())
+  userId    String
+  workId    String
+  grantedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work Work @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workId]) // Um usuário só pode vincular uma obra uma vez
+  @@map("work_entitlements")
 }
 model Work {
   id             String         @id @default(cuid())
@@ -128,6 +157,7 @@ model Work {
   updatedAt      DateTime       @updatedAt
   chapters       Chapter[]
   reviews        Review[]
+  entitlements   WorkEntitlement[]
   libraryEntries LibraryEntry[]
   comments       Comment[]
   likes          WorkLike[]
