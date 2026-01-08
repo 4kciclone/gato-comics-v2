@@ -1,5 +1,5 @@
 import NextAuth from "next-auth";
-import { authConfig } from "./auth.config"; // <--- Importa a config leve
+import { authConfig } from "./auth.config";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -11,8 +11,8 @@ const LoginSchema = z.object({
 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  ...authConfig, // Espalha a config leve
-  providers: [   // Adiciona os providers pesados
+  ...authConfig,
+  providers: [
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
@@ -23,18 +23,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (validatedFields.success) {
           const { email, password } = validatedFields.data;
-
-          const user = await prisma.user.findUnique({
-            where: { email },
-          });
-
+          const user = await prisma.user.findUnique({ where: { email } });
           if (!user || !user.password) return null;
-
           const passwordsMatch = await bcrypt.compare(password, user.password);
-
           if (passwordsMatch) return user;
         }
-
         return null;
       },
     }),

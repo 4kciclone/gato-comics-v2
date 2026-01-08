@@ -5,7 +5,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
-import type { Prisma } from "@prisma/client"; // <-- PASSO 1: Importar o tipo Prisma
+
+// A importação de 'Prisma' foi removida.
 
 export type AuthState = {
   error?: string;
@@ -50,17 +51,12 @@ export async function register(prevState: AuthState, formData: FormData): Promis
     const hashedPassword = await bcrypt.hash(password, 10);
     const username = await createUniqueUsername(name);
 
-    // PASSO 2: Aplicar o tipo ao parâmetro 'tx'
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // CORREÇÃO: Removemos a tipagem explícita 'tx: Prisma.TransactionClient'.
+    // O TypeScript agora irá inferir o tipo de 'tx' corretamente.
+    await prisma.$transaction(async (tx) => {
         const newUser = await tx.user.create({
-            data: {
-                name,
-                username,
-                email,
-                password: hashedPassword,
-            },
+            data: { name, username, email, password: hashedPassword },
         });
-
         await tx.liteCoinBatch.create({
             data: {
                 userId: newUser.id,
@@ -68,7 +64,6 @@ export async function register(prevState: AuthState, formData: FormData): Promis
                 expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             },
         });
-
         await tx.transaction.create({
             data: {
                 userId: newUser.id,
@@ -99,10 +94,8 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
   } catch (error) {
     if (error instanceof AuthError) {
       switch (error.type) {
-        case "CredentialsSignin":
-          return { error: "Credenciais invalidas!" };
-        default:
-          return { error: "Algo deu errado." };
+        case "CredentialsSignin": return { error: "Credenciais invalidas!" };
+        default: return { error: "Algo deu errado." };
       }
     }
     throw error;
