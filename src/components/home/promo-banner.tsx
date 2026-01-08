@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Work } from "@prisma/client";
 
 // Estilo para o botão que será reutilizado
 export const buttonVariants = {
@@ -13,7 +14,7 @@ export const buttonVariants = {
 
 export async function PromoBanner() {
     const session = await auth();
-    let lastReadWork = null;
+    let lastReadWork: Work | null = null;
 
     // Se o usuário estiver logado, busca a última obra que ele leu
     if (session?.user?.id) {
