@@ -6,8 +6,6 @@ import { z } from "zod";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 
-// A importação de 'Prisma' foi removida.
-
 export type AuthState = {
   error?: string;
   success?: string;
@@ -51,8 +49,6 @@ export async function register(prevState: AuthState, formData: FormData): Promis
     const hashedPassword = await bcrypt.hash(password, 10);
     const username = await createUniqueUsername(name);
 
-    // CORREÇÃO: Removemos a tipagem explícita 'tx: Prisma.TransactionClient'.
-    // O TypeScript agora irá inferir o tipo de 'tx' corretamente.
     await prisma.$transaction(async (tx) => {
         const newUser = await tx.user.create({
             data: { name, username, email, password: hashedPassword },
