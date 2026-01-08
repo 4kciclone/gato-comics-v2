@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 // Tipagem do Estado de Retorno
 type SettingsState = {
@@ -13,7 +14,11 @@ export async function updateSettings(
   prevState: SettingsState,
   formData: FormData
 ): Promise<SettingsState> {
-  const settingsToUpdate = [];
+  // Tipagem correta: array de Promises que retornam o modelo Setting
+  const settingsToUpdate: Prisma.Prisma__SettingClient<{
+    key: string;
+    value: string;
+  }>[] = [];
 
   // O FormData do Switch envia "on" quando marcado, mas não envia nada quando desmarcado.
   // Precisamos garantir que o valor "false" seja salvo.
