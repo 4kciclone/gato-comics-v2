@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+import type { Prisma } from "@prisma/client"; // <-- PASSO 1: Importar o tipo Prisma
 
 export type AuthState = {
   error?: string;
@@ -49,30 +50,25 @@ export async function register(prevState: AuthState, formData: FormData): Promis
     const hashedPassword = await bcrypt.hash(password, 10);
     const username = await createUniqueUsername(name);
 
-    // CORREÇÃO: Usamos uma Transação para criar o usuário e seu primeiro lote de Patinhas Lite
-    await prisma.$transaction(async (tx) => {
-        // 1. Cria o usuário
+    // PASSO 2: Aplicar o tipo ao parâmetro 'tx'
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const newUser = await tx.user.create({
             data: {
                 name,
                 username,
                 email,
                 password: hashedPassword,
-                // O campo 'balanceLite' foi removido daqui
             },
         });
 
-        // 2. Cria o lote inicial de bônus de Patinhas Lite
         await tx.liteCoinBatch.create({
             data: {
                 userId: newUser.id,
-                amount: 5, // Bônus de boas-vindas
-                // O lote expira em 7 dias a partir do registro
+                amount: 5,
                 expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             },
         });
 
-        // 3. (Opcional) Adiciona uma transação ao extrato
         await tx.transaction.create({
             data: {
                 userId: newUser.id,
