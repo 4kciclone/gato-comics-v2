@@ -19,6 +19,7 @@ import {
   Palette,
   Share2
 } from "lucide-react";
+import { LibraryEntry, Unlock } from "@prisma/client";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -41,20 +42,21 @@ export default async function WorkPage({ params }: Props) {
     return notFound();
   }
 
-  let userHistory = null;
-  let userUnlocks: Map<string, { type: 'PERMANENT' | 'RENTAL'; expiresAt: Date | null }> = new Map();
+  // Tipagem correta para userHistory
+  let userHistory: LibraryEntry | null = null;
+  let userUnlocks: Map<string, Unlock> = new Map();
   let isLiked = false;
   let userRating = 0;
 
   if (session?.user?.id) {
     const [history, unlocks, like, review] = await Promise.all([
         prisma.libraryEntry.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } } }),
-        prisma.unlock.findMany({ where: { userId: session.user.id, chapterId: { in: work.chapters.map(c => c.id) } } }).then(u => new Map(u.map(i => [i.chapterId, i]))),
+        prisma.unlock.findMany({ where: { userId: session.user.id, chapterId: { in: work.chapters.map(c => c.id) } } }),
         prisma.workLike.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } } }),
         prisma.review.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } }, select: { rating: true } }),
     ]);
     userHistory = history;
-    userUnlocks = unlocks as any;
+    userUnlocks = new Map(unlocks.map(u => [u.chapterId, u]));
     isLiked = !!like;
     userRating = review?.rating || 0;
   }
@@ -76,8 +78,13 @@ export default async function WorkPage({ params }: Props) {
   const chaptersWithUserStatus = work.chapters.map(chapter => {
     const unlockInfo = userUnlocks.get(chapter.id);
     const isUnlocked = chapter.isFree || (unlockInfo?.type === 'PERMANENT');
-    const isRented = unlockInfo?.type === 'RENTAL' && unlockInfo.expiresAt! > new Date();
-    return { ...chapter, isUnlocked: isUnlocked || isRented, isRented, isRead: userHistory?.lastReadChapterId === chapter.id };
+    const isRented = unlockInfo?.type === 'RENTAL' && unlockInfo.expiresAt ? unlockInfo.expiresAt > new Date() : false;
+    return { 
+      ...chapter, 
+      isUnlocked: isUnlocked || isRented, 
+      isRented, 
+      isRead: userHistory?.lastReadChapterId === chapter.id 
+    };
   });
 
   return (
@@ -145,7 +152,7 @@ export default async function WorkPage({ params }: Props) {
                </div>
             </aside>
             <main className="lg:col-span-8">
-               <ChapterList chapters={chaptersWithUserStatus as any} workSlug={work.slug} lastReadChapterId={userHistory?.lastReadChapterId}/>
+               <ChapterList chapters={chaptersWithUserStatus} workSlug={work.slug} lastReadChapterId={userHistory?.lastReadChapterId}/>
             </main>
          </div>      
          <RecommendationsRail workId={work.id} userId={session?.user?.id} />
