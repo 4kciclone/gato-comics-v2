@@ -10,38 +10,30 @@ export const authConfig = {
     strategy: "jwt",
   },
   callbacks: {
-    // ESTA É A CHAVE PARA RESOLVER O LOGIN DUPLO
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const role = auth?.user?.role;
-      
-      const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
-      const isAdminRoute = nextUrl.pathname.startsWith("/admin");
-      const isPublicRoute = ["/", "/login", "/register", "/obra", "/busca", "/shop"].some(path => 
-        nextUrl.pathname === path || nextUrl.pathname.startsWith(path + "/")
-      );
+  authorized({ auth, request: { nextUrl } }) {
+    const isLoggedIn = !!auth?.user;
+    const { pathname } = nextUrl;
 
-      if (isApiAuthRoute) return true;
+    // 1. Permitir sempre rotas de API e Auth
+    if (pathname.startsWith("/api/auth")) return true;
 
-      // Se for rota admin, verifica login e role
-      if (isAdminRoute) {
-        if (!isLoggedIn) return false; // Redireciona para login
-        if (role !== "ADMIN" && role !== "OWNER") {
-          return Response.redirect(new URL("/", nextUrl));
-        }
-        return true;
-      }
+    // 2. Se o usuário estiver logado e tentar acessar login/register, manda para home
+    if (isLoggedIn && (pathname === "/login" || pathname === "/register")) {
+      return Response.redirect(new URL("/", nextUrl));
+    }
 
-      // Se logado e for para login/register, manda para home
-      if (isLoggedIn && (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")) {
-        return Response.redirect(new URL("/", nextUrl));
-      }
+    // 3. Se NÃO estiver logado e tentar acessar rotas privadas (como /admin), 
+    // o Auth.js redireciona automaticamente para /login se retornarmos false
+    const isPublicRoute = ["/", "/login", "/register", "/obra", "/busca", "/shop"].some(path => 
+      pathname === path || pathname.startsWith(path + "/")
+    );
 
-      // Se não for pública e não estiver logado, redireciona para login
-      if (!isPublicRoute && !isLoggedIn) return false;
+    if (!isPublicRoute && !isLoggedIn) {
+      return false; // Redireciona para login
+    }
 
-      return true;
-    },
+    return true; // Permite o acesso
+  },
 
     jwt({ token, user }) {
       if (user) {
