@@ -129,6 +129,15 @@ export async function register(
           password: hashedPassword 
         },
       });
+
+      await tx.activityLog.create({
+        data: {
+        type: 'NEW_USER',
+        message: `${name} acabou de se registrar.`,
+        link: `/u/${username}`,
+        metadata: { userId: newUser.id }
+        }
+      });
       
       // Criar lote de Patinhas Lite com 7 dias de validade
       await tx.liteCoinBatch.create({

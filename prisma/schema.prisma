@@ -60,6 +60,14 @@ enum SubscriptionTier {
   DIAMOND 
   }
 
+enum ActivityType {
+  NEW_USER
+  NEW_SUBSCRIPTION
+  NEW_CHAPTER
+  NEW_REPORT
+  POPULAR_POST // Exemplo para o futuro
+}
+
 // --------------------------------------------------------
 // MODELOS DE USUÁRIO & ECONOMIA
 // --------------------------------------------------------
@@ -363,4 +371,16 @@ model LiteCoinBatch {
   
   @@index([userId, expiresAt])
   @@map("lite_coin_batches")
+}
+
+model ActivityLog {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  message   String       // Mensagem a ser exibida, ex: "Paulo se registrou."
+  link      String?      // Link para o perfil do usuário ou para a obra
+  metadata  Json?        // Dados extras, como o nome do plano
+  createdAt DateTime     @default(now())
+
+  @@index([createdAt])
+  @@map("activity_logs")
 }

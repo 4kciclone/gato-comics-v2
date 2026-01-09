@@ -19,19 +19,9 @@ const CreateChapterSchema = z.object({
 });
 
 export async function createChapter(prevState: any, formData: FormData) {
-  
-  // CORREÇÃO: Usamos Object.fromEntries para limpar os nomes dos campos
   const data = Object.fromEntries(formData);
 
-  const validatedFields = CreateChapterSchema.safeParse({
-    workId: data.workId,
-    title: data.title,
-    number: data.number,
-    priceLite: data.priceLite,
-    pricePremium: data.pricePremium,
-    isFree: data.isFree,
-    file: data.file
-  });
+  const validatedFields = CreateChapterSchema.safeParse(data);
 
   if (!validatedFields.success) {
     console.error(validatedFields.error.flatten());
@@ -61,44 +51,54 @@ export async function createChapter(prevState: any, formData: FormData) {
       return { message: 'O ZIP nao contem imagens validas.' };
     }
 
-    imageFiles.sort((a, b) => 
-      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
-    );
+    imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
     const uploadPromises = imageFiles.map(async (img) => {
       const extension = img.name.split('.').pop();
       const key = `works/${workId}/ch-${number}/${crypto.randomUUID()}.${extension}`;
-      
       await r2.send(new PutObjectCommand({
         Bucket: R2_BUCKET,
         Key: key,
         Body: img.data,
         ContentType: `image/${extension === 'jpg' ? 'jpeg' : extension}`,
       }));
-
       return `${R2_PUBLIC_URL}/${key}`;
     });
 
     const imageUrls = await Promise.all(uploadPromises);
 
-    await prisma.chapter.create({
-      data: {
-        workId,
-        title,
-        slug: `cap-${number}`,
-        order: number,
-        priceLite,
-        pricePremium,
-        isFree: isFree === 'on',
-        images: imageUrls,
-      }
-    });
+    const [newChapter, work] = await prisma.$transaction([
+        prisma.chapter.create({
+            data: {
+                workId, title,
+                slug: `cap-${number}`,
+                order: number,
+                priceLite, pricePremium,
+                isFree: isFree === 'on',
+                images: imageUrls,
+            }
+        }),
+        prisma.work.findUnique({ where: { id: workId } })
+    ]);
+    
+    // REGISTRA A ATIVIDADE
+    if (work) {
+        await prisma.activityLog.create({
+            data: {
+                type: 'NEW_CHAPTER',
+                message: `Capítulo ${number} de "${work.title}" foi publicado.`,
+                link: `/obra/${work.slug}`,
+                metadata: { workId, chapterId: newChapter.id }
+            }
+        });
+    }
 
   } catch (error) {
     console.error('Erro no upload:', error);
     return { message: 'Falha critica no upload. Verifique os logs do servidor.' };
   }
 
+  revalidatePath("/admin/dashboard"); // Revalida o dashboard
   revalidatePath(`/admin/works/${workId}`);
   redirect(`/admin/works/${workId}`);
 }
