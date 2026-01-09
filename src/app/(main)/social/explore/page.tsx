@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { PostCard, type PostWithMeta } from "@/components/social/post-card";
 import { Compass, Star } from "lucide-react";
 import Link from "next/link";

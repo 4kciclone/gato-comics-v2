@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Home, Compass, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma"; // <-- IMPORTAÇÃO CORRIGIDA
 import { TrendingTopics } from "@/components/social/trending-topics";
 

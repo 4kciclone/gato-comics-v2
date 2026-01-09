@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 /**
  * Busca todos os dados necessários para a página do leitor de capítulos.

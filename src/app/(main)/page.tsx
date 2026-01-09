@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import { WorkCard } from "@/components/home/work-card";
 import { Button } from "@/components/ui/button";

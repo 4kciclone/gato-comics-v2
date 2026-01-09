@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CommentForm } from "./comment-form";
 import { CommentItem } from "./comment-item";
