@@ -39,7 +39,7 @@ export function CanvasImage({ src, alt, index }: CanvasImageProps) {
   return (
     // Renderiza o canvas, mas ele começa vazio. O useEffect preencherá.
     // Usamos um aspect-ratio com min-height para evitar pulos de layout.
-    <div className="relative w-full aspect-[2/3] min-h-64 bg-zinc-900">
+    <div className="relative w-full aspect-2/3 min-h-64 bg-zinc-900">
        <canvas 
          ref={canvasRef} 
          aria-label={alt}

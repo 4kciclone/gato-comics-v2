@@ -1,14 +1,22 @@
-import { UserRole } from "@prisma/client"; // Importa nosso Enum para manter a consistência
-import NextAuth, { type DefaultSession } from "next-auth";
+import { DefaultSession, DefaultUser } from "next-auth";
+import { JWT, DefaultJWT } from "next-auth/jwt";
+import { UserRole } from "@prisma/client";
 
-// Estende o tipo 'Session' para incluir a propriedade 'role'
 declare module "next-auth" {
   interface Session {
     user: {
-      /**
-       * A role do usuário, vinda do nosso banco de dados.
-       */
+      id: string;
       role: UserRole;
-    } & DefaultSession["user"]; // Une com as propriedades padrão (name, email, image)
+    } & DefaultSession["user"];
+  }
+
+  interface User extends DefaultUser {
+    role: UserRole;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT extends DefaultJWT {
+    role: UserRole;
   }
 }

@@ -28,7 +28,7 @@ export function MobileDrawer({ username, isLoggedIn }: MobileDrawerProps) {
     { href: "/", label: "Início", icon: Home },
     { href: "/social", label: "Comunidade", icon: Users },
     { href: "/shop", label: "Loja", icon: ShoppingBag },
-    ...(username ? [{ href: `/u/${username}`, label: "Perfil Social", icon: User }] : [])
+    //...(username ? [{ href: `/u/${username}`, label: "Perfil Social", icon: User }] : [])
   ];
 
   return (
@@ -40,7 +40,7 @@ export function MobileDrawer({ username, isLoggedIn }: MobileDrawerProps) {
       </SheetTrigger>
       <SheetContent 
         side="left" 
-        className="bg-[#FFD700] p-0 w-[85%] sm:w-[400px] border-r-4 border-black"
+        className="bg-[#FFD700] p-0 w-[85%] sm:w-400px border-r-4 border-black"
         style={{
           backgroundImage: `radial-gradient(#00000033 1px, transparent 1px)`,
           backgroundSize: `8px 8px`,

@@ -26,7 +26,7 @@ function LazyCanvasImage(props: { src: string; alt: string; index: number; }) {
     <div ref={ref}>
       {inView ? <CanvasImage {...props} /> : (
         // Placeholder para manter o espaço e evitar pulos de layout
-        <div className="w-full aspect-[2/3] min-h-64 bg-zinc-900 animate-pulse" />
+        <div className="w-full aspect-2/3 min-h-64 bg-zinc-900 animate-pulse" />
       )}
     </div>
   );
