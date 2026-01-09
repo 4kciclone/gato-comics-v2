@@ -1,7 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { auth } from "@/auth";
+
+// Tipo explícito para os itens de navegação
+type NavChapter = { slug: string; order: number; } | null;
 
 export async function getChapterData(workSlug: string, chapterSlug: string) {
   const session = await auth();
@@ -11,78 +14,61 @@ export async function getChapterData(workSlug: string, chapterSlug: string) {
     where: { slug: workSlug },
     select: { id: true, title: true, slug: true }
   });
-
   if (!work) return { success: false, error: 'Obra nao encontrada', code: 404 } as const;
 
   const chapter = await prisma.chapter.findUnique({
-    where: {
-      workId_slug: { workId: work.id, slug: chapterSlug }
-    },
+    where: { workId_slug: { workId: work.id, slug: chapterSlug } },
     include: {
       work: {
         select: {
           slug: true,
-          chapters: {
-            select: { slug: true, order: true },
-            orderBy: { order: 'asc' }
-          }
+          chapters: { select: { slug: true, order: true }, orderBy: { order: 'asc' } }
         }
       }
     }
   });
-
   if (!chapter) return { success: false, error: 'Capitulo nao encontrado', code: 404 } as const;
 
-  // 2. LÓGICA DE ACESSO COMPLETA
+  // 2. Lógica de Acesso
   let isUnlocked = chapter.isFree;
-
   if (!isUnlocked && session?.user?.id) {
-    
-    // --- PASSO 1: VERIFICAÇÃO DE "FREEPASS" DA ASSINATURA ---
-    // Verifica se o usuário tem um 'WorkEntitlement' ativo para esta obra.
-    const entitlement = await prisma.workEntitlement.findUnique({
-      where: {
-        userId_workId: {
-          userId: session.user.id,
-          workId: work.id
-        }
-      },
-      // Para performance, só precisamos saber se ele existe
-      select: { id: true } 
-    });
-
+    const entitlement = await prisma.workEntitlement.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } } });
     if (entitlement) {
-      isUnlocked = true; // Se tem o "vínculo", libera o acesso imediatamente.
+      isUnlocked = true;
     }
-    // --- FIM DA VERIFICAÇÃO DE "FREEPASS" ---
-
-    // Se não tiver o "Freepass", a lógica continua como antes
     if (!isUnlocked) {
-      // @ts-ignore - Admin/Owner têm acesso
+      // @ts-ignore
       if (session.user.role === 'ADMIN' || session.user.role === 'OWNER') {
-          isUnlocked = true;
+        isUnlocked = true;
       } else {
-          // Verifica o desbloqueio por patinhas (compra/aluguel)
-          const unlockRecord = await prisma.unlock.findUnique({
-              where: { userId_chapterId: { userId: session.user.id, chapterId: chapter.id } }
-          });
-          if (unlockRecord) {
-              if (unlockRecord.type === 'PERMANENT' || (unlockRecord.type === 'RENTAL' && unlockRecord.expiresAt && unlockRecord.expiresAt > new Date())) {
-                  isUnlocked = true;
-              }
-          }
+        const unlockRecord = await prisma.unlock.findUnique({ where: { userId_chapterId: { userId: session.user.id, chapterId: chapter.id } } });
+        if (unlockRecord && (unlockRecord.type === 'PERMANENT' || (unlockRecord.type === 'RENTAL' && unlockRecord.expiresAt && unlockRecord.expiresAt > new Date()))) {
+          isUnlocked = true;
+        }
       }
     }
   }
   
-  // ... (código para ATUALIZAÇÃO DA BIBLIOTECA e NAVEGAÇÃO, sem alterações)
-  if (isUnlocked && session?.user?.id) { /* ... */ }
-  const prevChapter = null; // simulado
-  const nextChapter = null; // simulado
+  // 3. Atualização de Histórico
+  if (isUnlocked && session?.user?.id) {
+    try {
+      await prisma.libraryEntry.upsert({
+        where: { userId_workId: { userId: session.user.id, workId: work.id } },
+        create: { userId: session.user.id, workId: work.id, status: 'READING', lastReadChapterId: chapter.id },
+        update: { lastReadChapterId: chapter.id, status: 'READING', updatedAt: new Date() }
+      });
+    } catch (error) { console.error("Falha ao atualizar biblioteca:", error); }
+  }
+
+  // 4. Lógica de Navegação
+  const sortedChapters = chapter.work.chapters;
+  const currentIndex = sortedChapters.findIndex(c => c.slug === chapter.slug);
+  const prevChapter: NavChapter = sortedChapters[currentIndex - 1] || null;
+  const nextChapter: NavChapter = sortedChapters[currentIndex + 1] || null;
 
   return {
     success: true,
-    session: session,
+    session,
     work,
     chapter: {
       id: chapter.id,
