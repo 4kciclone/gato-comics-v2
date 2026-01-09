@@ -1,3 +1,4 @@
+// src/auth.config.ts
 import type { NextAuthConfig } from "next-auth";
 import { UserRole } from "@prisma/client";
 
@@ -9,10 +10,43 @@ export const authConfig = {
     strategy: "jwt",
   },
   callbacks: {
+    // ESTA É A CHAVE PARA RESOLVER O LOGIN DUPLO
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user;
+      const role = auth?.user?.role;
+      
+      const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
+      const isAdminRoute = nextUrl.pathname.startsWith("/admin");
+      const isPublicRoute = ["/", "/login", "/register", "/obra", "/busca", "/shop"].some(path => 
+        nextUrl.pathname === path || nextUrl.pathname.startsWith(path + "/")
+      );
+
+      if (isApiAuthRoute) return true;
+
+      // Se for rota admin, verifica login e role
+      if (isAdminRoute) {
+        if (!isLoggedIn) return false; // Redireciona para login
+        if (role !== "ADMIN" && role !== "OWNER") {
+          return Response.redirect(new URL("/", nextUrl));
+        }
+        return true;
+      }
+
+      // Se logado e for para login/register, manda para home
+      if (isLoggedIn && (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")) {
+        return Response.redirect(new URL("/", nextUrl));
+      }
+
+      // Se não for pública e não estiver logado, redireciona para login
+      if (!isPublicRoute && !isLoggedIn) return false;
+
+      return true;
+    },
+
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        token.role = user.role; // Cast temporário ou use a solução de tipos abaixo
+        token.role = user.role;
       }
       return token;
     },
@@ -24,5 +58,5 @@ export const authConfig = {
       return session;
     },
   },
-  providers: [], // Provedores vazios aqui, pois serão preenchidos no arquivo auth.ts principal
-} satisfies NextAuthConfig; // <--- O erro estava aqui (era NextAuthConfig)
+  providers: [],
+} satisfies NextAuthConfig;
