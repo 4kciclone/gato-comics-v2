@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 // Tipo explícito para os itens de navegação
 type NavChapter = { slug: string; order: number; } | null;
