@@ -1,145 +1,110 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PostCard, type PostWithMeta } from "@/components/social/post-card";
-import { FollowButton } from "@/components/profile/follow-button";
-import { Calendar, MapPin } from "lucide-react";
-import { Prisma } from "@prisma/client";
-
-// Força a página a ser sempre dinâmica e nunca usar cache
-export const dynamic = 'force-dynamic';
+import { Badge } from "@/components/ui/badge";
+import { CalendarDays, Wallet } from "lucide-react";
+import { auth } from "@/lib/auth";
 
 interface ProfilePageProps {
-  params: { username: string };
+  params: Promise<{ username: string }>;
 }
 
-export default async function UserProfilePage({ params }: ProfilePageProps) {
-  const { username } = params;
-
-  // --- GUARDA DE SEGURANÇA ---
-  // Se, por qualquer motivo de roteamento, o 'username' chegar como undefined,
-  // retorna um 404 imediatamente para evitar a query inválida.
-  if (!username) {
-    console.error("[SERVER /u/[username]] ERRO GRAVE: Parâmetro 'username' chegou como undefined.");
-    return notFound();
-  }
-
-  console.log(`[SERVER /u/[username]] --- INICIANDO RENDERIZAÇÃO PARA PARÂMETRO: ${username} ---`);
-
+export default async function ProfilePage({ params }: ProfilePageProps) {
+  const { username } = await params;
   const session = await auth();
-  const sessionUserId = session?.user?.id;
 
-  console.log(`[SERVER /u/[username]] Buscando no Prisma com 'username' = '${username}'`);
-
-  const user = await prisma.user.findFirst({
-    where: { 
-        username: {
-            equals: username,
-            mode: "insensitive"
-        }
-    },
+  const user = await prisma.user.findUnique({
+    where: { username },
     include: {
-      equippedAvatarFrame: { select: { imageUrl: true } },
-      _count: {
-        select: { followers: true, following: true },
-      },
-    },
+        equippedAvatarFrame: true,
+        equippedProfileBanner: true,
+    }
   });
 
-  if (!user) {
-    console.log(`[SERVER /u/[username]] USUÁRIO NÃO ENCONTRADO para '${username}'. Retornando 404.`);
-    return notFound();
-  }
-  console.log(`[SERVER /u/[username]] Usuário encontrado: ${user.name} (ID: ${user.id})`);
+  if (!user) return notFound();
 
-  const isFollowing = sessionUserId ? !!(await prisma.follow.findUnique({
-    where: {
-      followerId_followingId: {
-        followerId: sessionUserId,
-        followingId: user.id,
-      },
-    },
-  })) : false;
-
-  const postInclude = Prisma.validator<Prisma.PostInclude>()({
-      user: { select: { id: true, name: true, username: true, image: true, equippedAvatarFrame: { select: { imageUrl: true } } } },
-      _count: { select: { likes: true, comments: true } },
-      likes: { where: { userId: sessionUserId || "" } }
-  });
-
-  const userPosts = await prisma.post.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-    take: 30,
-    include: postInclude,
-  });
-
-  const postsWithMeta: PostWithMeta[] = userPosts.map((post: typeof userPosts[0]) => ({
-    ...post,
-    isLiked: post.likes.length > 0
-  }));
-  
-  const userAvatarUrl = user.image || `https://ui-avatars.com/api/?name=${user.name || 'G'}`;
-  const frameUrl = user.equippedAvatarFrame?.imageUrl;
+  const isOwnProfile = session?.user?.id === user.id;
 
   return (
-    <div className="min-h-screen">
-      <div className="relative h-48 bg-zinc-900 border-b border-[#27272a]"></div>
+    <div className="min-h-screen bg-[#050505] text-white">
+      {/* BANNER DO PERFIL */}
+      <div className="relative h-48 md:h-64 bg-zinc-900 w-full overflow-hidden">
+        {user.equippedProfileBanner ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img 
+                src={user.equippedProfileBanner.imageUrl} 
+                alt="Banner" 
+                className="w-full h-full object-cover"
+            />
+        ) : (
+            <div className="absolute inset-0 bg-gradient-to-r from-[#FFD700]/20 to-zinc-900" />
+        )}
+      </div>
 
-      <div className="container mx-auto px-4">
-        <div className="relative -mt-16 flex flex-col gap-4 border-b border-[#27272a] pb-6">
-          <div className="flex justify-between items-start">
-            <div className="relative w-32 h-32 shrink-0">
-              <Avatar className="w-full h-full border-4 border-[#050505] rounded-full">
-                <AvatarImage src={userAvatarUrl} />
-                <AvatarFallback className="text-3xl font-bold">{user.name?.charAt(0).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              {frameUrl && <img src={frameUrl} alt="Moldura" className="absolute -inset-1 w-34 h-34 pointer-events-none" />}
+      <div className="container mx-auto px-4 pb-20">
+        <div className="relative -mt-16 mb-6 flex flex-col md:flex-row items-end gap-6">
+            {/* AVATAR */}
+            <div className="relative">
+                <Avatar className="w-32 h-32 border-4 border-[#050505] shadow-xl bg-[#111]">
+                    <AvatarImage src={user.image || ""} />
+                    <AvatarFallback className="text-4xl bg-[#FFD700] text-black font-bold">
+                        {user.name?.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                </Avatar>
+                {/* Moldura */}
+                {user.equippedAvatarFrame && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img 
+                        src={user.equippedAvatarFrame.imageUrl} 
+                        alt="Frame" 
+                        className="absolute -top-4 -left-4 w-40 h-40 pointer-events-none z-10"
+                    />
+                )}
             </div>
-            
-            {sessionUserId && sessionUserId !== user.id && (
-              <div className="pt-16">
-                 <FollowButton profileUserId={user.id} isFollowingInitial={isFollowing} />
-              </div>
-            )}
-          </div>
 
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-white">{user.name}</h1>
-            <p className="text-zinc-500">@{user.username}</p>
-          </div>
-
-          <p className="text-zinc-300 text-sm max-w-lg">
-            Bio do usuário.
-          </p>
-          
-          <div className="flex items-center gap-6 text-sm text-zinc-500">
-            <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> Brasil</div>
-            <div className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4" /> 
-                Entrou em {new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            {/* INFO */}
+            <div className="flex-1 mb-2 space-y-1">
+                <h1 className="text-3xl font-bold text-white flex items-center gap-2 flex-wrap">
+                    {user.name}
+                    {user.role === "ADMIN" && <Badge className="bg-red-600">ADMIN</Badge>}
+                    {user.role === "OWNER" && <Badge className="bg-[#FFD700] text-black">DONO</Badge>}
+                </h1>
+                <p className="text-zinc-400 font-mono">@{user.username}</p>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4 text-sm">
-            <p><strong className="text-white">{user._count.following}</strong> <span className="text-zinc-500">Seguindo</span></p>
-            <p><strong className="text-white">{user._count.followers}</strong> <span className="text-zinc-500">Seguidores</span></p>
-          </div>
+            <div className="mb-4">
+                 <div className="flex items-center gap-2 text-zinc-500 text-sm bg-[#111] px-3 py-1 rounded-full border border-[#27272a]">
+                    <CalendarDays className="w-4 h-4" />
+                    <span>Desde {user.createdAt.toLocaleDateString('pt-BR')}</span>
+                 </div>
+            </div>
         </div>
 
-        <div className="mt-6">
-          <h2 className="text-lg font-bold text-white mb-4">Posts & Respostas</h2>
-          <div className="border-t border-[#27272a]">
-            {postsWithMeta.length > 0 ? (
-              postsWithMeta.map(post => (<PostCard key={post.id} post={post} />))
-            ) : (
-              <div className="text-center text-zinc-500 py-20">
-                <p>@{user.name} ainda não postou nada.</p>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* ESTATÍSTICAS (SÓ VISÍVEL PARA O DONO) */}
+        {isOwnProfile && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                <div className="bg-[#111] border border-[#27272a] rounded-xl p-6">
+                    <h3 className="font-bold text-[#FFD700] mb-4 flex items-center gap-2">
+                        <Wallet className="w-5 h-5" /> Carteira
+                    </h3>
+                    <div className="space-y-3">
+                        <div className="flex justify-between border-b border-[#27272a] pb-2">
+                            <span className="text-zinc-400">Patinhas Lite</span>
+                            {/* Cálculo manual das patinhas lite não expiradas (simplificado para exibição) */}
+                            <span className="font-bold text-white">Ver no menu</span>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                            <span className="text-zinc-400">Patinhas Premium</span>
+                            <span className="font-bold text-[#FFD700]">{user.balancePremium}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="md:col-span-2 bg-[#111] border border-[#27272a] rounded-xl p-6 flex items-center justify-center text-zinc-500">
+                    <p>Histórico de leitura e conquistas aparecerão aqui em breve.</p>
+                </div>
+            </div>
+        )}
       </div>
     </div>
   );
