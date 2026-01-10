@@ -3,14 +3,20 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { signIn, signOut } from "@/lib/auth"; // Verifique se o caminho está correto (@/auth ou @/lib/auth)
+import { signIn, signOut } from "@/lib/auth"; 
 import { AuthError } from "next-auth";
 import { Prisma } from "@prisma/client";
+import { differenceInYears } from "date-fns"; 
+import { sendWelcomeEmailWithTerms } from "@/lib/mail"; // Importa a função de email
 
 export type AuthState = {
   error?: string;
   success?: string;
 } | null;
+
+// ----------------------------------------------------------------------
+// SCHEMAS DE VALIDAÇÃO
+// ----------------------------------------------------------------------
 
 const RegisterSchema = z.object({
   name: z.string()
@@ -22,6 +28,14 @@ const RegisterSchema = z.object({
   password: z.string()
     .min(6, "Senha deve ter pelo menos 6 caracteres")
     .max(100, "Senha muito longa"),
+  // Validação LGPD: Data válida
+  dateOfBirth: z.string().refine((date) => !isNaN(Date.parse(date)), {
+    message: "Data de nascimento inválida",
+  }),
+  // Validação LGPD: Termos obrigatórios
+  terms: z.string().optional().refine((val) => val === "on", {
+    message: "Você deve aceitar os Termos de Uso e Política de Privacidade.",
+  }),
 });
 
 const LoginSchema = z.object({
@@ -30,9 +44,10 @@ const LoginSchema = z.object({
   redirectTo: z.string().optional(),
 });
 
-/**
- * Helper: Cria um username único baseado no nome
- */
+// ----------------------------------------------------------------------
+// HELPERS
+// ----------------------------------------------------------------------
+
 async function createUniqueUsername(
   name: string, 
   tx: Prisma.TransactionClient
@@ -60,40 +75,68 @@ async function createUniqueUsername(
     if (!existingUser) break;
     counter++;
     finalUsername = `${username}${counter}`;
-    if (counter > 999) break;
+    if (counter > 9999) {
+      finalUsername = `${username}${Date.now()}`;
+      break;
+    }
   }
   return finalUsername;
 }
 
-/**
- * Action de Registro
- */
+// ----------------------------------------------------------------------
+// ACTIONS
+// ----------------------------------------------------------------------
+
 export async function register(
   prevState: AuthState, 
   formData: FormData
 ): Promise<AuthState> {
-  const validatedFields = RegisterSchema.safeParse(Object.fromEntries(formData.entries()));
+  const rawData = Object.fromEntries(formData.entries());
+  const validatedFields = RegisterSchema.safeParse(rawData);
 
   if (!validatedFields.success) {
     const errors = validatedFields.error.flatten().fieldErrors;
     return { error: Object.values(errors)[0]?.[0] || "Dados inválidos." };
   }
 
-  const { email, password, name } = validatedFields.data;
+  const { email, password, name, dateOfBirth } = validatedFields.data;
+
+  // --- REGRA LGPD: IDADE MÍNIMA (12 ANOS) ---
+  const birthDate = new Date(dateOfBirth);
+  const age = differenceInYears(new Date(), birthDate);
+
+  if (age < 12) {
+    return { error: "Desculpe, você precisa ter pelo menos 12 anos para criar uma conta." };
+  }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) return { error: "Este email já está em uso." };
+    const existingUser = await prisma.user.findUnique({ 
+      where: { email },
+      select: { id: true }
+    });
+    
+    if (existingUser) {
+      return { error: "Este email já está em uso." };
+    }
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Criação do usuário e bônus
     await prisma.$transaction(async (tx) => {
       const username = await createUniqueUsername(name, tx);
+      
       const newUser = await tx.user.create({
-        data: { name, username, email, password: hashedPassword },
+        data: { 
+          name, 
+          username, 
+          email, 
+          password: hashedPassword,
+          dateOfBirth: birthDate,
+          termsAcceptedAt: new Date(),
+          privacyVersion: "v1.0 (LGPD-2026)",
+        },
       });
 
-      // Logs e Bônus
       await tx.activityLog.create({
         data: {
           type: 'NEW_USER',
@@ -122,16 +165,24 @@ export async function register(
       });
     });
 
-    return { success: "Conta criada! Faça login para continuar." };
+    // --- ENVIO DO EMAIL COM OS TERMOS ---
+    // Tentamos enviar o email. Se falhar, logamos o erro, mas não bloqueamos o cadastro.
+    try {
+      await sendWelcomeEmailWithTerms(email, name);
+    } catch (mailError) {
+      console.error("Falha ao enviar email de termos:", mailError);
+    }
+
+    return { 
+      success: "Conta criada! Um email com os termos foi enviado para você. Faça login." 
+    };
+
   } catch (error) {
-    console.error(error);
-    return { error: "Erro ao criar conta." };
+    console.error("Erro no registro:", error);
+    return { error: "Erro ao criar conta. Tente novamente." };
   }
 }
 
-/**
- * Action de Login (Corrigida para evitar login duplo)
- */
 export async function login(
   prevState: AuthState, 
   formData: FormData
@@ -139,7 +190,9 @@ export async function login(
   const data = Object.fromEntries(formData.entries());
   const validatedFields = LoginSchema.safeParse(data);
 
-  if (!validatedFields.success) return { error: "Campos inválidos." };
+  if (!validatedFields.success) {
+    return { error: "Email ou senha inválidos." };
+  }
 
   const { email, password, redirectTo } = validatedFields.data;
 
@@ -147,16 +200,23 @@ export async function login(
     await signIn("credentials", {
       email,
       password,
-      redirectTo: redirectTo || "/",
+      redirectTo: redirectTo || "/", 
     });
+    
     return null;
+    
   } catch (error) {
     if (error instanceof AuthError) {
-      if (error.type === "CredentialsSignin") return { error: "Credenciais inválidas." };
-      return { error: "Erro ao entrar." };
+      switch (error.type) {
+        case "CredentialsSignin":
+          return { error: "Email ou senha incorretos." };
+        case "CallbackRouteError":
+          return { error: "Erro de conexão. Tente novamente." };
+        default:
+          return { error: "Algo deu errado ao entrar." };
+      }
     }
-    // IMPORTANTE: Permitir que o Next.js trate o redirecionamento
-    throw error;
+    throw error; // Necessário para o redirect do Next.js funcionar
   }
 }
 

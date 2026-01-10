@@ -8,7 +8,7 @@ datasource db {
 }
 
 // --------------------------------------------------------
-// ENUMS (SINTAXE CORRIGIDA)
+// ENUMS
 // --------------------------------------------------------
 enum UserRole {
   USER
@@ -52,20 +52,18 @@ enum ReportStatus {
   PENDING
   RESOLVED
 }
-
 enum SubscriptionTier { 
   BRONZE 
   SILVER 
   GOLD 
   DIAMOND 
-  }
-
+}
 enum ActivityType {
   NEW_USER
   NEW_SUBSCRIPTION
   NEW_CHAPTER
   NEW_REPORT
-  POPULAR_POST // Exemplo para o futuro
+  POPULAR_POST
 }
 
 // --------------------------------------------------------
@@ -73,15 +71,22 @@ enum ActivityType {
 // --------------------------------------------------------
 model User {
   id                        String        @id @default(cuid())
-  username                  String       @unique
+  username                  String        @unique
   name                      String?
   email                     String        @unique
   emailVerified             DateTime?
   image                     String?
   password                  String?
   role                      UserRole      @default(USER)
+  
+  // --- CAMPOS NOVOS DA LGPD (2026) ---
+  dateOfBirth               DateTime      // Obrigatório para cálculo de idade
+  termsAcceptedAt           DateTime      @default(now()) // Prova legal de consentimento
+  privacyVersion            String        @default("v1.0") // Controle de versão dos termos
+  // ------------------------------------
+
   balancePremium            Int           @default(0)
-  liteCoinBatches LiteCoinBatch[]
+  liteCoinBatches           LiteCoinBatch[]
   xp                        Int           @default(0)
   mutedUntil                DateTime?
   equippedAvatarFrameId     String?
@@ -108,20 +113,21 @@ model User {
   notifications             Notification[] @relation("Notifications")
   originNotifications       Notification[] @relation("OriginNotifications")
   workLikes                 WorkLike[]
-
   workEntitlements          WorkEntitlement[]
 
   // CAMPOS DE ASSINATURA
-  stripeCustomerId          String?     @unique // ID do cliente no Stripe
+  stripeCustomerId          String?     @unique
   subscriptionTier          SubscriptionTier?
-  subscriptionId            String?     @unique // ID da assinatura no Stripe
+  subscriptionId            String?     @unique
   subscriptionValidUntil    DateTime?
-  entitlementChangeUntil    DateTime?   // Data limite para trocar as obras vinculadas
+  entitlementChangeUntil    DateTime?
 
   @@map("users")
 }
 
-// ... (Todos os outros modelos permanecem exatamente os mesmos)
+// ... MANTENHA O RESTO DO ARQUIVO IGUAL (Transaction, Work, etc...)
+// Vou omitir o restante aqui para economizar espaço, pois só o User mudou.
+// Certifique-se de manter os outros models (Transaction, Work, etc) abaixo.
 model Transaction {
   id          String          @id @default(cuid())
   userId      String
@@ -135,7 +141,7 @@ model Transaction {
   @@index([userId])
   @@map("transactions")
 }
-
+// ... (Continue com o resto do seu arquivo original)
 model WorkEntitlement {
   id        String   @id @default(cuid())
   userId    String
@@ -145,7 +151,7 @@ model WorkEntitlement {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   work Work @relation(fields: [workId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, workId]) // Um usuário só pode vincular uma obra uma vez
+  @@unique([userId, workId])
   @@map("work_entitlements")
 }
 model Work {
@@ -321,19 +327,14 @@ model Report {
   status     ReportStatus @default(PENDING)
   createdAt  DateTime     @default(now())
   resolvedAt DateTime?
-
-  // Relações (AGORA OPCIONAIS)
   commentId  String?
   comment    Comment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  
-  postId     String? // <-- NOVO
-  post       Post?       @relation(fields: [postId], references: [id], onDelete: Cascade) // <-- NOVO
-  
+  postId     String? 
+  post       Post?       @relation(fields: [postId], references: [id], onDelete: Cascade)
   reporterId String
   reporter   User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-
   @@index([commentId])
-  @@index([postId]) // <-- NOVO
+  @@index([postId]) 
   @@index([reporterId])
   @@map("reports")
 }
@@ -359,28 +360,23 @@ model WorkLike {
   @@id([userId, workId])
   @@map("work_likes")
 }
-
 model LiteCoinBatch {
   id        String   @id @default(cuid())
   userId    String
-  amount    Int      // Quantidade de Patinhas Lite neste lote
+  amount    Int      
   createdAt DateTime @default(now())
-  expiresAt DateTime // Data em que este lote expira (ex: createdAt + 7 dias)
-
+  expiresAt DateTime 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   @@index([userId, expiresAt])
   @@map("lite_coin_batches")
 }
-
 model ActivityLog {
   id        String       @id @default(cuid())
   type      ActivityType
-  message   String       // Mensagem a ser exibida, ex: "Paulo se registrou."
-  link      String?      // Link para o perfil do usuário ou para a obra
-  metadata  Json?        // Dados extras, como o nome do plano
+  message   String       
+  link      String?      
+  metadata  Json?        
   createdAt DateTime     @default(now())
-
   @@index([createdAt])
   @@map("activity_logs")
 }
