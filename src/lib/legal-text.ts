@@ -30,16 +30,22 @@ Para clareza, definimos:
 5.1. Obras: Todo o Conteúdo Digital é propriedade de seus autores ou licenciantes. O Gato Comics detém os direitos de distribuição.
 5.2. Proibido: Você não pode copiar, tirar prints (screenshots) sistemáticos, distribuir ou vender qualquer obra encontrada na plataforma. Pirataria resultará em banimento imediato e medidas legais.
 
-6. CONDUTA DO USUÁRIO
+6. POLÍTICA DE REEMBOLSO E CANCELAMENTO
+6.1. O usuário tem o direito de desistir da compra de pacotes de "Patinhas Premium" em até 7 (sete) dias corridos após a transação (Art. 49 do CDC).
+6.2. EXCEÇÃO DE CONSUMO: O direito de arrependimento é automaticamente renunciado se o usuário utilizar, total ou parcialmente, as Patinhas adquiridas para desbloquear capítulos ou comprar itens cosméticos antes de solicitar o cancelamento.
+6.3. Ao desbloquear um capítulo, o usuário reconhece que o serviço foi prestado integralmente naquele instante, não cabendo reembolso por "não ter gostado" da obra.
+6.4. CHARGEBACKS: A contestação indevida de compras no cartão de crédito (chargeback) após a utilização das Patinhas será considerada fraude e violação destes termos, resultando no bloqueio permanente da conta.
+
+7. CONDUTA DO USUÁRIO
 É proibido:
 - Postar comentários com discurso de ódio, spoilers intencionais sem aviso, ou links maliciosos.
 - Tentar fraudar o sistema de "Patinhas Lite" criando múltiplas contas (farm).
 - Usar automação (bots) para raspar dados do site.
 
-7. ENCERRAMENTO E SUSPENSÃO
+8. ENCERRAMENTO E SUSPENSÃO
 Podemos encerrar ou suspender sua conta sem aviso prévio se você violar estes Termos. Em caso de banimento por fraude ou pirataria, você perderá quaisquer Patinhas ou Cosméticos acumulados.
 
-8. LIMITAÇÃO DE RESPONSABILIDADE
+9. LIMITAÇÃO DE RESPONSABILIDADE
 O serviço é fornecido "como está". Não garantimos que o serviço será ininterrupto. A Gato Comics LTDA não se responsabiliza por falhas técnicas externas (ex: queda de internet do usuário) que impeçam o acesso temporário ao conteúdo.
   `,
 
@@ -119,7 +125,7 @@ export const EMAIL_TEMPLATE = (username: string) => `
       
       <div class="box">
         <h3>Resumo dos Termos de Uso</h3>
-        <p>Você concordou que o uso de "Patinhas" e "Cosméticos" constitui uma licença de uso limitada e não propriedade real. Você se compromete a manter uma conduta respeitosa nos comentários e a não piratear o conteúdo.</p>
+        <p>Você concordou que o uso de "Patinhas" e "Cosméticos" constitui uma licença de uso limitada e não propriedade real. Também aceitou nossa política de reembolso, onde o direito de arrependimento cessa ao utilizar as moedas.</p>
       </div>
 
       <div class="box">
