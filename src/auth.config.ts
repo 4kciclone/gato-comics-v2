@@ -1,41 +1,33 @@
-// src/auth.config.ts
 import type { NextAuthConfig } from "next-auth";
 import { UserRole } from "@prisma/client";
 
 export const authConfig = {
-  trustHost: true,
   pages: {
     signIn: "/login",
   },
-  session: {
-    strategy: "jwt",
-  },
   callbacks: {
-  authorized({ auth, request: { nextUrl } }) {
-    const isLoggedIn = !!auth?.user;
-    const { pathname } = nextUrl;
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user;
+      const isOnLoginPage = nextUrl.pathname.startsWith("/login");
+      const isOnRegisterPage = nextUrl.pathname.startsWith("/register");
 
-    // 1. Permitir sempre rotas de API e Auth
-    if (pathname.startsWith("/api/auth")) return true;
+      // 1. Se já está logado e tenta acessar Login ou Register, manda para Home
+      if (isLoggedIn && (isOnLoginPage || isOnRegisterPage)) {
+        return Response.redirect(new URL("/", nextUrl));
+      }
 
-    // 2. Se o usuário estiver logado e tentar acessar login/register, manda para home
-    if (isLoggedIn && (pathname === "/login" || pathname === "/register")) {
-      return Response.redirect(new URL("/", nextUrl));
-    }
+      // 2. Proteção de rotas privadas (Ex: Perfil, Configurações)
+      // Adicione aqui as rotas que APENAS usuários logados podem ver no site principal
+      const privateRoutes = ["/settings", "/profile", "/library"];
+      const isPrivateRoute = privateRoutes.some(route => nextUrl.pathname.startsWith(route));
 
-    // 3. Se NÃO estiver logado e tentar acessar rotas privadas (como /admin), 
-    // o Auth.js redireciona automaticamente para /login se retornarmos false
-    const isPublicRoute = ["/", "/login", "/register", "/obra", "/busca", "/shop"].some(path => 
-      pathname === path || pathname.startsWith(path + "/")
-    );
+      if (isPrivateRoute && !isLoggedIn) {
+        return false; // Redireciona para /login automaticamente
+      }
 
-    if (!isPublicRoute && !isLoggedIn) {
-      return false; // Redireciona para login
-    }
-
-    return true; // Permite o acesso
-  },
-
+      // Todo o resto é público (Home, Obras, Leitura)
+      return true;
+    },
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
@@ -51,5 +43,5 @@ export const authConfig = {
       return session;
     },
   },
-  providers: [],
+  providers: [], 
 } satisfies NextAuthConfig;

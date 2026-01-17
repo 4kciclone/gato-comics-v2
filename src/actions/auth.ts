@@ -7,7 +7,8 @@ import { signIn, signOut } from "@/lib/auth";
 import { AuthError } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { differenceInYears } from "date-fns"; 
-import { sendWelcomeEmailWithTerms } from "@/lib/mail"; // Importa a função de email
+import { sendWelcomeEmailWithTerms } from "@/lib/mail"; 
+import { cookies } from "next/headers"; // <--- NOVO: Necessário para limpar cookies manualmente
 
 export type AuthState = {
   error?: string;
@@ -166,7 +167,6 @@ export async function register(
     });
 
     // --- ENVIO DO EMAIL COM OS TERMOS ---
-    // Tentamos enviar o email. Se falhar, logamos o erro, mas não bloqueamos o cadastro.
     try {
       await sendWelcomeEmailWithTerms(email, name);
     } catch (mailError) {
@@ -216,10 +216,44 @@ export async function login(
           return { error: "Algo deu errado ao entrar." };
       }
     }
-    throw error; // Necessário para o redirect do Next.js funcionar
+    throw error; 
   }
 }
 
+/**
+ * Logout robusto que limpa cookies compartilhados
+ */
 export async function logout() {
-  await signOut({ redirectTo: "/login" });
+  try {
+    const cookieStore = await cookies();
+    
+    // Determina o nome do cookie baseado no ambiente
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieName = isProduction 
+      ? "__Secure-authjs.session-token" 
+      : "authjs.session-token";
+      
+    // Determina o domínio (CRUCIAL para subdomínios)
+    const cookieDomain = isProduction 
+      ? ".gatocomics.com.br" 
+      : ".gatocomics.local"; 
+
+    // Força a deleção do cookie no domínio raiz
+    cookieStore.delete({
+      name: cookieName,
+      domain: cookieDomain,
+      path: "/", 
+    });
+
+    // Chama o signOut do NextAuth para garantir o fluxo
+    await signOut({ redirectTo: "/login" });
+    
+  } catch (error) {
+    // Se o erro for o redirect padrão do Next.js, deixa passar
+    if ((error as Error).message === "NEXT_REDIRECT") {
+        throw error;
+    }
+    console.error("Erro no logout:", error);
+    throw error;
+  }
 }
