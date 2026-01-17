@@ -220,40 +220,9 @@ export async function login(
   }
 }
 
-/**
- * Logout robusto que limpa cookies compartilhados
- */
 export async function logout() {
-  try {
-    const cookieStore = await cookies();
-    
-    // Determina o nome do cookie baseado no ambiente
-    const isProduction = process.env.NODE_ENV === "production";
-    const cookieName = isProduction 
-      ? "__Secure-authjs.session-token" 
-      : "authjs.session-token";
-      
-    // Determina o domínio (CRUCIAL para subdomínios)
-    const cookieDomain = isProduction 
-      ? ".gatocomics.com.br" 
-      : ".gatocomics.local"; 
-
-    // Força a deleção do cookie no domínio raiz
-    cookieStore.delete({
-      name: cookieName,
-      domain: cookieDomain,
-      path: "/", 
-    });
-
-    // Chama o signOut do NextAuth para garantir o fluxo
-    await signOut({ redirectTo: "/login" });
-    
-  } catch (error) {
-    // Se o erro for o redirect padrão do Next.js, deixa passar
-    if ((error as Error).message === "NEXT_REDIRECT") {
-        throw error;
-    }
-    console.error("Erro no logout:", error);
-    throw error;
-  }
+  // Apenas o signOut padrão, redirecionando para a Home ou Login do site
+  await signOut({ redirectTo: "/login" });
 }
+    
+  
