@@ -7,18 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
-import { TermsModal } from "@/components/auth/terms-modal"; 
+import { Loader2, ShieldCheck } from "lucide-react";
+import { TermsModal } from "@/components/auth/terms-modal"; // Certifique-se que este componente existe
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState(register, null);
-  
-  // Estado que conecta o Modal ao Checkbox
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050505] p-4">
-      <Card className="w-full max-w-md bg-[#111111] border-[#27272a] text-white shadow-2xl">
+      <Card className="w-full max-w-md bg-[#111111] border-[#27272a] text-white">
         <CardHeader>
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
             Crie sua conta
@@ -29,14 +27,13 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
-            
             <div className="space-y-2">
               <Label htmlFor="name">Nome de Usuário</Label>
               <Input 
                 id="name" 
                 name="name" 
                 placeholder="SuperLeitor" 
-                className="bg-[#050505] border-[#27272a] text-white focus:border-[#FFD700]" 
+                className="bg-[#050505] border-[#27272a] text-white" 
                 required 
               />
             </div>
@@ -48,24 +45,22 @@ export default function RegisterPage() {
                 name="email" 
                 type="email" 
                 placeholder="seu@email.com" 
-                className="bg-[#050505] border-[#27272a] text-white focus:border-[#FFD700]" 
+                className="bg-[#050505] border-[#27272a] text-white" 
                 required 
               />
             </div>
 
-            {/* CAMPO DE DATA (LGPD) - Com estilo para Dark Mode */}
+            {/* --- DATA DE NASCIMENTO (LGPD) --- */}
             <div className="space-y-2">
               <Label htmlFor="dateOfBirth">Data de Nascimento</Label>
               <Input 
                 id="dateOfBirth" 
                 name="dateOfBirth" 
                 type="date" 
-                className="bg-[#050505] border-[#27272a] text-white [color-scheme:dark] focus:border-[#FFD700]" 
+                className="bg-[#050505] border-[#27272a] text-white [color-scheme:dark]" 
                 required 
               />
-              <p className="text-xs text-zinc-500">
-                Necessário para verificar a idade mínima (12 anos).
-              </p>
+              <p className="text-xs text-zinc-500">Necessário para verificar a idade mínima (12 anos).</p>
             </div>
 
             <div className="space-y-2">
@@ -74,12 +69,12 @@ export default function RegisterPage() {
                 id="password" 
                 name="password" 
                 type="password" 
-                className="bg-[#050505] border-[#27272a] text-white focus:border-[#FFD700]" 
+                className="bg-[#050505] border-[#27272a] text-white" 
                 required 
               />
             </div>
 
-            {/* CHECKBOX E MODAL DE TERMOS */}
+            {/* --- TERMOS (LGPD) --- */}
             <div className="flex items-start space-x-2 pt-2">
               <input 
                 type="checkbox" 
@@ -87,41 +82,31 @@ export default function RegisterPage() {
                 name="terms" 
                 checked={termsAccepted}
                 onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-zinc-700 bg-[#050505] text-[#FFD700] focus:ring-[#FFD700] accent-[#FFD700]"
+                className="mt-1 h-4 w-4 rounded border-zinc-700 bg-[#050505] accent-[#FFD700]"
                 required 
               />
-              <label htmlFor="terms" className="text-sm text-zinc-400 leading-snug">
-                Eu li, entendi e aceito os 
-                {/* O Modal é acionado aqui */}
+              <label htmlFor="terms" className="text-sm text-zinc-400 leading-none">
+                Eu li e aceito os 
                 <TermsModal onAccept={() => setTermsAccepted(true)} />.
               </label>
             </div>
 
-            {/* MENSAGENS DE ERRO/SUCESSO */}
             {state?.error && (
-              <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded border border-red-900/50 animate-in fade-in slide-in-from-top-1">
-                {state.error}
-              </div>
+              <p className="text-red-400 text-sm bg-red-900/20 p-2 rounded border border-red-900">{state.error}</p>
             )}
             {state?.success && (
-              <div className="text-green-400 text-sm bg-green-900/20 p-3 rounded border border-green-900/50 animate-in fade-in slide-in-from-top-1">
-                {state.success}
-              </div>
+              <p className="text-green-400 text-sm bg-green-900/20 p-2 rounded border border-green-900">{state.success}</p>
             )}
 
-            <Button 
-              disabled={isPending} 
-              className="w-full bg-[#FFD700] text-black font-bold hover:bg-[#FFD700]/90 mt-4 transition-all"
-            >
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPending ? "Criando conta..." : "Criar Conta"}
+            <Button disabled={isPending} className="w-full bg-[#FFD700] text-black font-bold hover:bg-[#FFD700]/90 mt-4">
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Criar Conta"}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="flex justify-center border-t border-[#27272a] mt-2 pt-4">
           <p className="text-sm text-zinc-400">
             Já tem conta?{" "}
-            <Link href="/login" className="text-[#FFD700] hover:underline font-medium">
+            <Link href="/login" className="text-[#FFD700] hover:underline">
               Entrar
             </Link>
           </p>
