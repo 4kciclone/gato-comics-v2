@@ -3,29 +3,30 @@ import { UserRole } from "@prisma/client";
 
 export const authConfig = {
   pages: {
-    signIn: "/login",
+    signIn: "/login", // Login local do site
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnLoginPage = nextUrl.pathname.startsWith("/login");
-      const isOnRegisterPage = nextUrl.pathname.startsWith("/register");
+      
+      // Rotas de Autenticação
+      const isOnAuthPage = nextUrl.pathname.startsWith("/login") || nextUrl.pathname.startsWith("/register");
 
-      // 1. Se já está logado e tenta acessar Login ou Register, manda para Home
-      if (isLoggedIn && (isOnLoginPage || isOnRegisterPage)) {
-        return Response.redirect(new URL("/", nextUrl));
+      if (isOnAuthPage) {
+        if (isLoggedIn) {
+          // CORREÇÃO: Se já está logado no site, manda para a HOME (/), não para Dashboard
+          return Response.redirect(new URL("/", nextUrl)); 
+        }
+        return true; // Deixa acessar login/register se não estiver logado
       }
 
-      // 2. Proteção de rotas privadas (Ex: Perfil, Configurações)
-      // Adicione aqui as rotas que APENAS usuários logados podem ver no site principal
-      const privateRoutes = ["/settings", "/profile", "/library"];
-      const isPrivateRoute = privateRoutes.some(route => nextUrl.pathname.startsWith(route));
-
-      if (isPrivateRoute && !isLoggedIn) {
-        return false; // Redireciona para /login automaticamente
+      // Proteção de rotas privadas do SITE (Perfil, Leitura Paga, etc)
+      const isPrivate = ["/profile", "/settings", "/library"].some(path => nextUrl.pathname.startsWith(path));
+      
+      if (isPrivate && !isLoggedIn) {
+        return false; // Manda pro login
       }
 
-      // Todo o resto é público (Home, Obras, Leitura)
       return true;
     },
     jwt({ token, user }) {
