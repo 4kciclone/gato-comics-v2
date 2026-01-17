@@ -64,23 +64,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  // --- AQUI ESTÁ A CORREÇÃO CRÍTICA PARA SUBDOMÍNIOS ---
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === 'production' 
-        ? `__Secure-authjs.session-token` 
-        : `authjs.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        // O ponto no início (.) permite que o cookie seja lido em:
-        // gatocomics.local, admin.gatocomics.local, moderacao.gatocomics.local...
-        domain: process.env.NODE_ENV === "production"
-          ? ".gatocomics.com.br"
-          : ".gatocomics.local", 
-      },
-    },
-  },
+  
 });
