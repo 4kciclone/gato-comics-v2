@@ -7,7 +7,7 @@ import { z } from "zod";
 
 const LoginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(1), // Ajustei para min(1) para evitar erros de validação simples
 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -43,6 +43,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (!user || !user.password) {
             return null;
           }
+
+          // SE ESTE ARQUIVO FOR DO PROJETO ADMIN:
+          // Descomente a linha abaixo para impedir login de usuários comuns
+          // if (user.role === 'USER') return null; 
           
           const passwordsMatch = await bcrypt.compare(password, user.password);
           
@@ -50,7 +54,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
           
-          // Retornar usuário sem a senha
           const { password: _, ...userWithoutPassword } = user;
           return userWithoutPassword;
           
@@ -61,4 +64,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  // --- AQUI ESTÁ A CORREÇÃO CRÍTICA PARA SUBDOMÍNIOS ---
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' 
+        ? `__Secure-authjs.session-token` 
+        : `authjs.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        // O ponto no início (.) permite que o cookie seja lido em:
+        // gatocomics.local, admin.gatocomics.local, moderacao.gatocomics.local...
+        domain: process.env.NODE_ENV === "production"
+          ? ".gatocomics.com.br"
+          : ".gatocomics.local", 
+      },
+    },
+  },
 });
