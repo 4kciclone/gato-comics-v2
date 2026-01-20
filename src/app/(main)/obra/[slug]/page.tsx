@@ -35,7 +35,10 @@ export default async function WorkPage({ params }: Props) {
   const work = await prisma.work.findUnique({
     where: { slug, isHidden: false },
     include: {
-      chapters: { orderBy: { order: "desc" } },
+      chapters: { 
+        where: { workStatus: 'PUBLISHED' }, 
+        orderBy: { order: "desc" } 
+      },
       _count: { select: { chapters: true, likes: true, reviews: true } },
       reviews: { select: { rating: true } },
     },

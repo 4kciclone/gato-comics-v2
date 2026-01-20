@@ -32,6 +32,10 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
 
   if (!chapter) return notFound();
 
+  if (chapter.workStatus !== 'PUBLISHED') {
+      return notFound(); // Ou redirecionar para a obra
+  }
+
   // Verifica se o usuário tem acesso (Grátis, Permanente, ou Aluguel Válido)
   let isUnlocked = chapter.isFree;
   
@@ -83,12 +87,18 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
   // 4. Buscar Próximo e Anterior
   const [prevChapter, nextChapter] = await Promise.all([
     prisma.chapter.findFirst({
-        where: { workId: work.id, order: { lt: chapter.order } },
+        where: { workId: work.id, 
+            workStatus: 'PUBLISHED',
+            order: { lt: chapter.order } 
+        },
         orderBy: { order: 'desc' },
-        select: { slug: true, order: true }
+        select: { slug: true, order: true },
     }),
     prisma.chapter.findFirst({
-        where: { workId: work.id, order: { gt: chapter.order } },
+        where: { workId: work.id, 
+            workStatus: 'PUBLISHED',
+            order: { gt: chapter.order } 
+        },
         orderBy: { order: 'asc' },
         select: { slug: true, order: true }
     })
