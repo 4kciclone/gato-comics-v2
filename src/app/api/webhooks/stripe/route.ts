@@ -96,6 +96,8 @@ export async function POST(req: Request) {
                 subscriptionId: subscriptionId,
                 subscriptionTier: tier,
                 subscriptionValidUntil: validDate,
+
+                 entitlementChangeUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
               }
             }),
             prisma.liteCoinBatch.create({
