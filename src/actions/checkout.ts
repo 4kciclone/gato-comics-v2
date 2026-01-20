@@ -101,9 +101,16 @@ export async function createCheckoutSession(itemId: string, type: 'pack' | 'sub'
         },
       });
     }
-  } catch (error) {
-    console.error("Erro ao criar sessão de checkout Stripe:", error);
-    throw new Error("Não foi possível conectar com o sistema de pagamento.");
+  } catch (error: any) {
+    // Imprime o erro completo no console da VPS
+    console.error("❌ ERRO STRIPE DETALHADO:", JSON.stringify(error, null, 2));
+    
+    // Se for erro de autenticação, avisa especificamente
+    if (error.type === 'StripeAuthenticationError') {
+        console.error("⚠️ CHAVE DE API INVÁLIDA OU FALTANDO!");
+    }
+
+    throw new Error(`Erro Stripe: ${error.message}`); // Mostra o erro real na tela para debug
   }
 
   if (!stripeSession.url) {
