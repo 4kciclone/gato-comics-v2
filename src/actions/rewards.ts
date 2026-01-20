@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 // Configurações
-const DAILY_REWARD_AMOUNT = 5;
+const DAILY_REWARD_AMOUNT = 1;
 const AD_REWARD_AMOUNT = 1;
 const MAX_ADS_PER_DAY = 5;
 const LITE_COIN_EXPIRATION_DAYS = 7; // Validade das Patinhas Lite

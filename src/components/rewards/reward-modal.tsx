@@ -8,19 +8,18 @@ import { Gift, PlayCircle, Loader2, CheckCircle, Coins } from "lucide-react";
 import { claimDailyReward, watchAdReward, getRewardStatus } from "@/actions/rewards";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CurrencyIcon } from "@/components/ui/currency-icon";
 
 const MAX_ADS_PER_DAY = 5;
 
 export function RewardModal() {
   const [isOpen, setIsOpen] = useState(false);
-  // O estado de loading agora rastreia qual ação está em progresso
   const [isLoading, setIsLoading] = useState<'daily' | 'ad' | 'status' | false>(false);
   const [adTimer, setAdTimer] = useState(0);
 
   const [dailyClaimed, setDailyClaimed] = useState(false);
   const [adsWatched, setAdsWatched] = useState(0);
 
-  // Busca o status das recompensas do servidor quando o modal abre
   const fetchStatus = async () => {
     setIsLoading('status');
     const status = await getRewardStatus();
@@ -37,24 +36,23 @@ export function RewardModal() {
     }
   }, [isOpen]);
 
-  // Handler para o check-in diário
   const handleDaily = async () => {
     setIsLoading('daily');
     const res = await claimDailyReward();
     setIsLoading(false);
     if (res.error) {
       toast.error("Ops!", { description: res.error });
-      setDailyClaimed(true); // Garante que o botão fique desativado
+      setDailyClaimed(true);
     } else {
-      toast.success("Check-in Realizado!", { description: `Você ganhou +${res.amount} Patinhas Lite.` });
+      // O res.amount virá do backend, então a mensagem estará correta automaticamente
+      toast.success("Check-in Realizado!", { description: `Você ganhou +${res.amount} Patinha Lite.` });
       setDailyClaimed(true);
     }
   };
 
-  // Handler para simular assistir anúncio
   const handleWatchAd = () => {
-    setIsLoading('ad'); // Mostra o loader no botão
-    setAdTimer(5); // Inicia o timer de 5 segundos
+    setIsLoading('ad');
+    setAdTimer(5);
     const interval = setInterval(() => {
       setAdTimer((prev) => {
         if (prev <= 1) {
@@ -67,7 +65,6 @@ export function RewardModal() {
     }, 1000);
   };
 
-  // Handler chamado ao final do timer do anúncio
   const finishAd = async () => {
     const res = await watchAdReward();
     setIsLoading(false);
@@ -83,9 +80,8 @@ export function RewardModal() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-[#FFD700] hover:bg-[#FFD700]/10">
+        <Button variant="ghost" size="icon" className="relative text-[#401284] hover:bg-[#FFD700]/10">
            <Gift className="w-6 h-6 animate-pulse" />
-           {/* Notificação de ponto vermelho */}
            <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
         </Button>
       </DialogTrigger>
@@ -117,7 +113,7 @@ export function RewardModal() {
                )}
              >
                {isLoading === 'daily' ? <Loader2 className="animate-spin w-5 h-5"/> : 
-                dailyClaimed ? <><CheckCircle className="w-5 h-5 mr-2"/> Resgatado</> : "Resgatar +5"}
+                dailyClaimed ? <><CheckCircle className="w-5 h-5 mr-2"/> Resgatado</> : "Resgatar +1"} 
              </Button>
           </div>
 
@@ -138,17 +134,22 @@ export function RewardModal() {
                </div>
              ) : (
                <Button 
-                 onClick={handleWatchAd} 
-                 disabled={isLoading !== false || adsWatched >= MAX_ADS_PER_DAY}
-                 variant="outline"
-                 className="min-w-32 rounded-lg font-bold border-2 border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-               >
-                 {isLoading === 'ad' ? <Loader2 className="animate-spin w-5 h-5"/> : 
-                  <>
-                    +1 <Coins className="w-4 h-4 ml-2 text-zinc-500" />
-                  </>
-                 }
-               </Button>
+  onClick={handleWatchAd} 
+  disabled={isLoading !== false || adsWatched >= MAX_ADS_PER_DAY}
+  variant="outline"
+  className="min-w-[100px] h-10 px-4 rounded-lg font-bold border-2 border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-800 hover:text-white hover:border-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+>
+  {isLoading === 'ad' ? (
+    <Loader2 className="animate-spin w-5 h-5"/>
+  ) : (
+    // AQUI ESTÁ A MÁGICA DO ALINHAMENTO
+    <div className="flex items-center justify-center gap-2">
+      <span className="text-base pt-0.5">+1</span>
+      {/* Passamos size 11, que vira 22px na tela (tamanho ideal para botão) */}
+      <CurrencyIcon type="lite" size={11} /> 
+    </div>
+  )}
+</Button>
              )}
           </div>
           

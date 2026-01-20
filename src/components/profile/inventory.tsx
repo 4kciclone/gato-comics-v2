@@ -45,7 +45,7 @@ export function Inventory({ cosmetics, equippedFrameId, equippedBgId, userAvatar
 
       {/* SEÇÃO DE FUNDOS */}
       <section>
-        <h3 className="text-xl font-bold text-white mb-6">Fundos de Comentário</h3>
+        <h3 className="text-xl font-bold text-white mb-6">Banner de Comentário</h3>
         {backgrounds.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {backgrounds.map((cosmetic) => (
@@ -58,7 +58,7 @@ export function Inventory({ cosmetics, equippedFrameId, equippedBgId, userAvatar
             ))}
           </div>
         ) : (
-          <p className="text-zinc-500 text-sm">Nenhum fundo no inventário.</p>
+          <p className="text-zinc-500 text-sm">Nenhum Banner no inventário.</p>
         )}
       </section>
     </div>

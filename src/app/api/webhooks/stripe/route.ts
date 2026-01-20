@@ -1,146 +1,182 @@
 import { headers } from "next/headers";
-import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { COIN_PACKS, SUBSCRIPTION_PLANS } from "@/lib/shop-config";
 import { SubscriptionTier } from "@prisma/client";
 
+// Inicializa o Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // @ts-ignore - Ignoramos erro de versão pois estamos usando uma feature flag específica
+  apiVersion: "2025-12-15.clover", 
+  typescript: true,
+});
+
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(req: Request) {
   const body = await req.text();
   const signature = (await headers()).get("Stripe-Signature") as string;
+  
   let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch (err: any) {
-    console.error(`❌ Webhook signature verification failed: ${err.message}`);
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    console.error(`❌ Webhook signature verification failed: ${errorMessage}`);
+    return new NextResponse(`Webhook Error: ${errorMessage}`, { status: 400 });
   }
 
+  // Casting global do objeto data para any para evitar erros de tipagem em versões beta
   const session = event.data.object as any;
   
   try {
-    // --- Lida com todos os eventos do Checkout ---
+    // ====================================================
+    // EVENTO 1: CHECKOUT CONCLUÍDO
+    // ====================================================
     if (event.type === "checkout.session.completed") {
       const userId = session.metadata?.userId;
-      if (!userId) return new NextResponse("Webhook Error: Metadados 'userId' ausente.", { status: 400 });
       
-      // Caso: Compra avulsa de um Pacote de Moedas
+      if (!userId) {
+        return new NextResponse("Webhook Error: userId ausente.", { status: 200 });
+      }
+
+      // --- COMPRA DE PACOTE ---
       if (session.mode === 'payment' && session.metadata?.type === 'PACK') {
         const packKey = session.metadata?.packKey;
-        if (!packKey) return new NextResponse("Webhook Error: Metadados 'packKey' ausente.", { status: 400 });
+        const pack = packKey ? COIN_PACKS[packKey] : undefined;
 
-        const pack = COIN_PACKS[packKey as keyof typeof COIN_PACKS];
-        if (!pack) return new NextResponse(`Webhook Error: Pacote inválido '${packKey}'.`, { status: 400 });
-
-        await prisma.$transaction([
-          prisma.user.update({
-            where: { id: userId },
-            data: { balancePremium: { increment: pack.premium } }
-          }),
-          prisma.transaction.create({
-            data: { userId, amount: pack.premium, currency: "PREMIUM", type: "DEPOSIT", description: `Compra do Pacote: ${pack.label}` }
-          }),
-          ...(pack.lite > 0 ? [
-            prisma.liteCoinBatch.create({
-              data: { userId, amount: pack.lite, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
-            }),
+        if (pack) {
+          await prisma.$transaction([
+            prisma.user.update({ where: { id: userId }, data: { balancePremium: { increment: pack.premium } } }),
             prisma.transaction.create({
-              data: { userId, amount: pack.lite, currency: "LITE", type: "EARN", description: `Bônus do Pacote: ${pack.label}` }
-            })
-          ] : [])
-        ]);
-        console.log(`💰 Pacote '${pack.label}' creditado para o usuário ${userId}`);
+              data: { userId, amount: pack.premium, currency: "PREMIUM", type: "DEPOSIT", description: `Pacote: ${pack.label}` }
+            }),
+            ...(pack.lite > 0 ? [
+              prisma.liteCoinBatch.create({
+                data: { userId, amount: pack.lite, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
+              }),
+              prisma.transaction.create({
+                data: { userId, amount: pack.lite, currency: "LITE", type: "EARN", description: `Bônus: ${pack.label}` }
+              })
+            ] : [])
+          ]);
+          console.log(`💰 Pacote entregue para ${userId}`);
+        }
       } 
-      // Caso: Nova Assinatura
+      
+      // --- PRIMEIRA ASSINATURA ---
       else if (session.mode === 'subscription') {
         const planKey = session.metadata?.planKey;
-        if (!planKey) return new NextResponse("Webhook Error: Metadados 'planKey' ausente.", { status: 400 });
-
+        const plan = planKey ? SUBSCRIPTION_PLANS[planKey] : undefined;
+        
         const subscriptionId = session.subscription as string;
-        const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
-        const plan = SUBSCRIPTION_PLANS[planKey as keyof typeof SUBSCRIPTION_PLANS];
-        
-        // Extrair current_period_end do objeto retornado
-        const periodEnd = (subscriptionData as any).current_period_end;
-        
-        const user = await prisma.user.update({
-          where: { id: userId },
-          data: {
-            subscriptionId: subscriptionData.id,
-            subscriptionTier: planKey.split('_')[1].toUpperCase() as SubscriptionTier,
-            subscriptionValidUntil: new Date(periodEnd * 1000),
-          }
-        });
-        
-        if (user) {
-          await prisma.activityLog.create({
-            data: {
-              type: 'NEW_SUBSCRIPTION',
-              message: `${user.name || 'Um usuário'} assinou o plano ${plan.label}.`,
-              link: user.username ? `/u/${user.username}` : undefined,
-              metadata: { plan: plan.label, userId: user.id }
-            }
-          });
-          console.log(`✨ Nova assinatura '${plan.label}' criada para o usuário ${userId}`);
+        const customerId = session.customer as string;
+
+        if (subscriptionId && plan) {
+          const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
+          
+          // CORREÇÃO: Usamos (subscriptionData as any) para forçar o acesso ao campo
+          const periodEndTimestamp = (subscriptionData as any).current_period_end;
+          
+          // Fallback caso venha nulo (segurança)
+          const validDate = periodEndTimestamp 
+            ? new Date(periodEndTimestamp * 1000) 
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+          const tierKey = planKey?.split('_')[1]?.toUpperCase();
+          const tier = tierKey as SubscriptionTier;
+
+          await prisma.$transaction([
+            prisma.user.update({
+              where: { id: userId },
+              data: {
+                stripeCustomerId: customerId,
+                subscriptionId: subscriptionId,
+                subscriptionTier: tier,
+                subscriptionValidUntil: validDate,
+              }
+            }),
+            prisma.liteCoinBatch.create({
+              data: { userId, amount: plan.monthlyPaws, expiresAt: validDate }
+            }),
+            prisma.transaction.create({
+              data: { userId, amount: plan.monthlyPaws, currency: "LITE", type: "EARN", description: `Assinatura Iniciada: ${plan.label}` }
+            }),
+            prisma.activityLog.create({
+              data: { type: 'NEW_SUBSCRIPTION', message: `Assinou o plano ${plan.label}`, metadata: { userId } }
+            })
+          ]);
+          console.log(`👑 Assinatura ${plan.label} ativada para ${userId}`);
         }
       }
     }
 
-    // --- Lida com eventos de renovação de assinatura ---
+    // ====================================================
+    // EVENTO 2: RENOVAÇÃO AUTOMÁTICA
+    // ====================================================
     if (event.type === "invoice.payment_succeeded") {
-      const invoice = event.data.object as Stripe.Invoice;
-      const subscriptionId = (invoice as any).subscription as string | null;
+      // CORREÇÃO: Casting para any aqui também
+      const invoice = event.data.object as any;
+      
+      if (invoice.billing_reason === 'subscription_create') {
+        return new NextResponse(null, { status: 200 });
+      }
 
-      if (subscriptionId && typeof subscriptionId === 'string') {
-        const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
-        const periodEnd = (subscriptionData as any).current_period_end;
-        
-        const user = await prisma.user.findFirst({ 
-          where: { subscriptionId: subscriptionData.id } 
+      // Acessando subscription com segurança via 'any'
+      const subscriptionId = typeof invoice.subscription === 'string' 
+        ? invoice.subscription 
+        : invoice.subscription?.id;
+
+      if (subscriptionId) {
+        const user = await prisma.user.findFirst({
+          where: { subscriptionId: subscriptionId }
         });
 
-        if (user && user.subscriptionTier) {
+        if (!user) {
+          return new NextResponse(null, { status: 200 });
+        }
+
+        if (user.subscriptionTier) {
           const planKey = `sub_${user.subscriptionTier.toLowerCase()}`;
-          const plan = SUBSCRIPTION_PLANS[planKey as keyof typeof SUBSCRIPTION_PLANS];
+          const plan = SUBSCRIPTION_PLANS[planKey];
           
-          await prisma.$transaction([
-            prisma.user.update({
-              where: { id: user.id },
-              data: {
-                subscriptionValidUntil: new Date(periodEnd * 1000),
-                entitlementChangeUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-              }
-            }),
-            prisma.liteCoinBatch.create({ 
-              data: { 
-                userId: user.id, 
-                amount: plan.monthlyPaws, 
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) 
-              } 
-            }),
-            prisma.transaction.create({ 
-              data: { 
-                userId: user.id, 
-                amount: plan.monthlyPaws, 
-                currency: "LITE", 
-                type: "EARN", 
-                description: `Renovacao Assinatura ${plan.label}` 
-              } 
-            })
-          ]);
+          const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
           
-          console.log(`🔄 A assinatura '${plan.label}' foi renovada para o usuário ${user.id}`);
+          // CORREÇÃO: Casting para acessar current_period_end
+          const periodEndTimestamp = (subscriptionData as any).current_period_end;
+          const validDate = new Date(periodEndTimestamp * 1000);
+
+          if (plan) {
+            await prisma.$transaction([
+              prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  subscriptionValidUntil: validDate,
+                  entitlementChangeUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                }
+              }),
+              prisma.liteCoinBatch.create({ 
+                data: { userId: user.id, amount: plan.monthlyPaws, expiresAt: validDate } 
+              }),
+              prisma.transaction.create({ 
+                data: { userId: user.id, amount: plan.monthlyPaws, currency: "LITE", type: "EARN", description: `Renovação Automática: ${plan.label}` } 
+              })
+            ]);
+            console.log(`🔄 Renovação processada para ${user.email}`);
+          }
         }
       }
     }
   
-    // --- Lida com o cancelamento da assinatura ---
+    // ====================================================
+    // EVENTO 3: CANCELAMENTO
+    // ====================================================
     if (event.type === 'customer.subscription.deleted') {
-      const subscription = event.data.object as Stripe.Subscription;
+      // Casting seguro
+      const subscription = event.data.object as any;
+      
       await prisma.user.updateMany({
         where: { subscriptionId: subscription.id },
         data: { 
@@ -149,12 +185,12 @@ export async function POST(req: Request) {
           entitlementChangeUntil: null 
         }
       });
-      console.log(`🚫 Assinatura '${subscription.id}' cancelada.`);
+      console.log(`🚫 Assinatura encerrada: ${subscription.id}`);
     }
 
   } catch (error) {
-    console.error("❌ Erro ao processar o webhook da Stripe:", error);
-    return new NextResponse("Webhook processing error", { status: 500 });
+    console.error("❌ Erro fatal no Webhook:", error);
+    return new NextResponse("Internal Error", { status: 500 });
   }
 
   return new NextResponse(null, { status: 200 });

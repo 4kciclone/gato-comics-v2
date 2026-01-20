@@ -147,23 +147,6 @@ export async function register(
         }
       });
       
-      await tx.liteCoinBatch.create({
-        data: {
-          userId: newUser.id,
-          amount: 5,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-      });
-      
-      await tx.transaction.create({
-        data: {
-          userId: newUser.id,
-          amount: 5,
-          currency: "LITE",
-          type: "EARN",
-          description: "Bônus de Registro",
-        },
-      });
     });
 
     // --- ENVIO DO EMAIL COM OS TERMOS ---

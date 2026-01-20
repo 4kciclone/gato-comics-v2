@@ -7,6 +7,7 @@ import {
   forwardRef,
   type ReactNode,
 } from "react";
+import Image from "next/image";
 import {
   Check,
   Gem,
@@ -14,13 +15,13 @@ import {
   Sparkles,
   Crown,
   Coins,
-  Star,
   Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useFormStatus } from "react-dom";
+import type { CoinPackIcon, SubscriptionIcon } from "@/lib/shop-config";
 
 /* =========================================================
  * SHOP BUTTON
@@ -71,7 +72,8 @@ interface PackCardProps {
   premium: number;
   lite: number;
   price: number;
-  icon: "bronze" | "silver" | "gold" | "diamond" | "legendary";
+  imagePath: string;
+  icon: CoinPackIcon;
   popular?: boolean;
   legendary?: boolean;
   packId: string;
@@ -83,33 +85,40 @@ export function PackCard({
   premium,
   lite,
   price,
+  imagePath,
   icon,
   popular,
   legendary,
   packId,
   action,
 }: PackCardProps) {
-  let iconColor = "text-zinc-400";
+  
   let glowColor = "group-hover:shadow-zinc-500/20";
   let borderColor = "border-zinc-800";
   let bgGradient = "from-[#111] to-[#0a0a0a]";
+  let textColor = "text-zinc-300";
 
-  if (icon === "bronze") iconColor = "text-orange-700";
-  if (icon === "silver") iconColor = "text-zinc-300";
-  if (icon === "gold") {
-    iconColor = "text-yellow-400";
-    glowColor = "group-hover:shadow-yellow-500/30";
-    borderColor = "group-hover:border-yellow-500/50";
-  }
-  if (icon === "diamond") {
-    iconColor = "text-cyan-400";
-    glowColor = "group-hover:shadow-cyan-500/30";
-  }
-  if (legendary || icon === "legendary") {
-    iconColor = "text-purple-400";
-    glowColor = "shadow-purple-500/30 group-hover:shadow-purple-500/50";
-    borderColor = "border-purple-500";
-    bgGradient = "from-[#1a0b2e] to-[#0a0a0a]";
+  switch (icon) {
+    case "bronze":
+      glowColor = "group-hover:shadow-orange-700/20";
+      textColor = "text-orange-600";
+      break;
+    case "gold":
+      glowColor = "group-hover:shadow-yellow-500/30";
+      borderColor = "group-hover:border-yellow-500/50";
+      textColor = "text-yellow-500";
+      break;
+    case "diamond":
+      glowColor = "group-hover:shadow-cyan-500/30";
+      borderColor = "group-hover:border-cyan-500/50";
+      textColor = "text-cyan-400";
+      break;
+    case "legendary":
+      glowColor = "shadow-purple-500/30 group-hover:shadow-purple-500/50";
+      borderColor = "border-purple-500";
+      bgGradient = "from-[#1a0b2e] to-[#0a0a0a]";
+      textColor = "text-purple-500";
+      break;
   }
 
   return (
@@ -134,45 +143,48 @@ export function PackCard({
         )}
       >
         {popular && (
-          <div className="absolute top-0 right-0 bg-[#FFD700] text-black text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest">
+          <div className="absolute top-0 right-0 bg-[#FFD700] text-black text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest z-20">
             Best Seller
           </div>
         )}
 
         {legendary && (
-          <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest">
+          <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest z-20">
             Lendário
           </div>
         )}
 
-        <div className="flex justify-center mb-6 mt-2">
-          <div
-            className={cn(
-              "p-4 rounded-full bg-white/5 ring-1 ring-white/10 relative",
-              iconColor
-            )}
-          >
-            <Gem className="w-8 h-8" />
-            <div className={cn("absolute inset-0 blur-xl opacity-40", iconColor)} />
+        <div className="flex justify-center mb-4 mt-2 relative">
+          <div className="relative w-32 h-32 transition-transform duration-500 group-hover:scale-110 drop-shadow-2xl">
+             <Image 
+                src={imagePath}
+                alt={label}
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, 33vw"
+             />
           </div>
+          <div className={cn("absolute inset-0 blur-3xl opacity-20 -z-10", textColor.replace('text-', 'bg-'))} />
         </div>
 
         <div className="text-center space-y-1 mb-8">
-          <h3 className="text-zinc-400 uppercase tracking-widest text-xs">
+          <h3 className="text-zinc-400 uppercase tracking-widest text-xs font-bold">
             {label}
           </h3>
-          <div className="text-4xl font-black text-white flex justify-center gap-2">
-            {premium} <Coins className="w-6 h-6 text-[#FFD700]" />
+          <div className="text-4xl font-black text-white flex justify-center gap-2 items-center">
+            {premium} <span className="text-[#FFD700] text-2xl">🐾</span>
           </div>
 
           {lite > 0 && (
-            <div className="inline-flex items-center gap-1 bg-green-900/30 text-green-400 px-2 py-0.5 rounded text-xs font-bold border border-green-900/50">
-              <Sparkles className="w-3 h-3" /> +{lite} Bônus Lite
+            <div className="inline-flex items-center gap-1.5 bg-green-900/30 text-green-400 px-2 py-0.5 rounded text-xs font-bold border border-green-900/50 mt-2">
+              {/* IMAGEM DA PATINHA LITE AQUI */}
+              <Image src="/assets/paw-purple.webp" alt="Lite" width={14} height={14} />
+              <span>+{lite} Lite</span>
             </div>
           )}
         </div>
 
-        <form action={action} className="mt-auto">
+        <form action={action} className="mt-auto relative z-20">
           <input type="hidden" name="packId" value={packId} />
           <ShopButton price={price} highlight={popular || legendary} />
         </form>
@@ -190,7 +202,9 @@ interface SubCardProps {
   monthlyPaws: number;
   discount: number;
   works: number;
-  icon?: "zap" | "sparkles" | "crown" | "diamond";
+  icon?: SubscriptionIcon;
+  imagePath: string;
+  glowColor?: string;
   recommended?: boolean;
   subId: string;
   action: (formData: FormData) => void;
@@ -202,54 +216,50 @@ export function SubscriptionCard({
   monthlyPaws,
   discount,
   works,
-  icon,
+  imagePath,
+  glowColor,
   recommended,
   subId,
   action,
 }: SubCardProps) {
-  let Icon = Zap;
-  let iconColor = "text-orange-500";
-
-  if (icon === "sparkles") {
-    Icon = Sparkles;
-    iconColor = "text-zinc-300";
-  }
-  if (icon === "crown") {
-    Icon = Crown;
-    iconColor = "text-yellow-400";
-  }
-  if (icon === "diamond") {
-    Icon = Gem;
-    iconColor = "text-cyan-400";
-  }
-
+  
   return (
     <div
       className={cn(
-        "group relative flex flex-col rounded-2xl transition-all duration-300",
+        "group relative flex flex-col rounded-2xl transition-all duration-300 overflow-hidden",
         recommended
           ? "border-2 border-[#FFD700] bg-[#0f0f0f] scale-105 z-10 shadow-[0_0_40px_rgba(255,215,0,0.15)]"
           : "border border-zinc-800 bg-[#0a0a0a] hover:border-zinc-600"
       )}
     >
+      <div className={cn("absolute inset-0 bg-gradient-to-b opacity-0 group-hover:opacity-10 transition-opacity", glowColor?.replace("shadow-", "from-").replace("/20", "/5") + " to-transparent")} />
+
       {recommended && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FFD700] text-black text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-[#FFD700] text-black text-[10px] font-black px-4 py-1 rounded-b-lg uppercase tracking-widest shadow-lg flex items-center gap-1 z-20">
           <Crown className="w-3 h-3" /> Recomendado
         </div>
       )}
 
-      <div className="p-8 flex flex-col h-full">
-        <div className="flex items-center gap-4 mb-6 pt-2">
-          <div className={cn("p-3 rounded-lg bg-zinc-900", iconColor)}>
-            <Icon className="w-6 h-6" />
+      <div className="p-8 flex flex-col h-full relative z-10">
+        
+        <div className="flex flex-col items-center mb-6 pt-4">
+          <div className="relative w-28 h-28 mb-4 drop-shadow-2xl transition-transform duration-500 group-hover:scale-110">
+             <Image 
+                src={imagePath}
+                alt={label}
+                fill
+                className="object-contain"
+                sizes="150px"
+                priority={recommended}
+             />
           </div>
-          <h3 className="text-xl font-bold text-white uppercase tracking-wider">
+          <h3 className="text-xl font-black text-white uppercase tracking-widest mt-2">
             {label}
           </h3>
         </div>
 
-        <div className="mb-8">
-          <div className="flex items-baseline gap-1">
+        <div className="mb-8 text-center">
+          <div className="flex items-baseline justify-center gap-1">
             <span className="text-zinc-500 text-lg">R$</span>
             <span className="text-5xl font-black text-white">
               {Math.floor(price / 100)}
@@ -257,24 +267,27 @@ export function SubscriptionCard({
             <span className="text-zinc-500">
               ,{(price % 100).toString().padStart(2, "0")}
             </span>
-            <span className="text-zinc-500 ml-1">/mês</span>
           </div>
-          <p className="text-xs text-zinc-500 mt-2">
-            Cancele quando quiser.
-          </p>
+          <p className="text-xs text-zinc-500 mt-1">/mês • Cancele quando quiser</p>
         </div>
 
-        <ul className="space-y-4 mb-8 flex-1">
+        <ul className="space-y-4 mb-8 flex-1 border-t border-zinc-800/50 pt-6">
           <ListItem text="Sem anúncios" highlighted />
-          <ListItem text={`${works} obras à escolha`} />
+          <ListItem text={`${works} obras à escolha`} icon={<Gem className="w-3 h-3"/>} />
+          {/* IMAGEM DA PATINHA LITE AQUI NA LISTA DE BENEFÍCIOS */}
           <ListItem
-            text={`${monthlyPaws} Patinhas Lite mensais`}
+            text={
+                <span className="flex items-center gap-1.5">
+                    {monthlyPaws} <Image src="/assets/paw-purple.webp" alt="Lite" width={16} height={16} /> mensais
+                </span>
+            }
             highlightText
+            icon={<Sparkles className="w-3 h-3"/>}
           />
           <ListItem text={`${discount}% de desconto na loja`} />
         </ul>
 
-        <form action={action}>
+        <form action={action} className="mt-auto">
           <input type="hidden" name="subId" value={subId} />
           <ShopButton price={price} isSub highlight={recommended} />
         </form>
@@ -292,7 +305,7 @@ function ListItem({
   highlightText,
   icon,
 }: {
-  text: string;
+  text: React.ReactNode; // Atualizado para aceitar Componentes (Imagem)
   highlighted?: boolean;
   highlightText?: boolean;
   icon?: React.ReactNode;
@@ -444,4 +457,3 @@ const TabButton = forwardRef<
     </button>
   );
 });
-

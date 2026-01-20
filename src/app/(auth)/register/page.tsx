@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, ShieldCheck } from "lucide-react";
-import { TermsModal } from "@/components/auth/terms-modal"; // Certifique-se que este componente existe
+import { Loader2 } from "lucide-react";
+import { TermsModal } from "@/components/auth/terms-modal"; 
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState(register, null);
@@ -21,8 +21,9 @@ export default function RegisterPage() {
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
             Crie sua conta
           </CardTitle>
+          {/* TEXTO ATUALIZADO: Removemos a menção das 5 patinhas */}
           <CardDescription className="text-zinc-400">
-            Ganhe 5 Patinhas Grátis ao se cadastrar!
+            Junte-se à nossa comunidade de leitores e acesse obras exclusivas.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -50,7 +51,6 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* --- DATA DE NASCIMENTO (LGPD) --- */}
             <div className="space-y-2">
               <Label htmlFor="dateOfBirth">Data de Nascimento</Label>
               <Input 
@@ -74,7 +74,6 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* --- TERMOS (LGPD) --- */}
             <div className="flex items-start space-x-2 pt-2">
               <input 
                 type="checkbox" 

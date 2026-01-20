@@ -37,10 +37,10 @@ export function NotificationBell({ initialNotifications }: { initialNotification
   return (
     <DropdownMenu onOpenChange={(open) => open && handleOpen()}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-zinc-400 hover:text-white">
-          <Bell className="w-5 h-5" />
+        <Button variant="ghost" size="icon" className="relative text-purple-600 hover:text-purple-500">
+         <Bell className="w-5 h-5" />
           {hasUnread && (
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           )}
         </Button>
       </DropdownMenuTrigger>

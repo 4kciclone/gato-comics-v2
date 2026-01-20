@@ -5,16 +5,18 @@ import { CommentItem } from "./comment-item";
 import { Prisma } from "@prisma/client";
 import { MessageSquare } from "lucide-react";
 
-// Definição de Tipos
+// Definição de Tipos para incluir dados do perfil (Cosméticos)
 const commentUserSelect = {
   select: {
+    id: true,
     name: true,
     image: true,
-    equippedAvatarFrame: true,
-    equippedCommentBackground: true,
+    equippedAvatarFrame: { select: { imageUrl: true } },
+    equippedCommentBackground: { select: { imageUrl: true } },
   }
 };
 
+// Validador do Prisma para garantir a tipagem recursiva (Respostas)
 const commentWithReplies = Prisma.validator<Prisma.CommentDefaultArgs>()({
   include: {
     user: commentUserSelect,
@@ -43,33 +45,30 @@ interface CommentSectionProps {
 
 export async function CommentSection({ workId, postId }: CommentSectionProps) {
   const session = await auth();
+  const currentUserId = session?.user?.id;
 
   const whereCondition = {
-    parentId: null, // Busca apenas comentários de nível superior
+    parentId: null, // Busca apenas comentários de nível superior (Raiz)
     ...(workId && { workId }),
     ...(postId && { postId }),
   };
   
-  // Condição para a contagem total (inclui respostas)
   const totalCountWhereCondition = {
     ...(workId && { workId }),
     ...(postId && { postId }),
   };
 
   const [comments, totalComments] = await Promise.all([
-    // Busca os comentários para exibir (só os principais)
     prisma.comment.findMany({
       where: whereCondition,
       ...commentWithReplies,
       orderBy: { createdAt: 'desc' }
     }),
-    // Faz uma contagem separada de TODOS os comentários e respostas
     prisma.comment.count({ where: totalCountWhereCondition })
   ]);
 
   return (
     <div className="bg-[#0a0a0a] border border-[#27272a] rounded-2xl p-6 md:p-8">
-      {/* CORREÇÃO: Usa 'totalComments' para o contador do título */}
       <h3 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
         <MessageSquare className="w-6 h-6 text-[#FFD700]" />
         Comentários ({totalComments})
@@ -87,10 +86,18 @@ export async function CommentSection({ workId, postId }: CommentSectionProps) {
 
       <div className="space-y-8">
         {comments.map(comment => (
-          <CommentItem key={comment.id} comment={comment} workId={workId} postId={postId} />
+          <CommentItem 
+            key={comment.id} 
+            comment={comment as any} 
+            workId={workId} 
+            postId={postId}
+            currentUserId={currentUserId} // Passamos o ID para permitir deletar
+          />
         ))}
         {comments.length === 0 && (
-           <p className="text-center text-zinc-600 py-10">Seja o primeiro a comentar!</p>
+           <div className="text-center py-10">
+              <p className="text-zinc-600">Seja o primeiro a comentar!</p>
+           </div>
         )}
       </div>
     </div>

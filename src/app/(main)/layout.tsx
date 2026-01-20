@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ import { NotificationBell } from "@/components/shared/notification-bell";
 import { Starfield } from "@/components/shared/starfield";
 import { MobileDrawer } from "@/components/shared/mobile-drawer";
 import { Search } from "lucide-react";
-import Logo from './logo.png';
+import { FaDiscord } from "react-icons/fa";
 
 type NotificationWithUser = {
   id: string;
@@ -33,7 +32,6 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         where: { id: userId },
         select: { username: true, balancePremium: true }
       }),
-      // Busca todos os lotes de Patinhas Lite que ainda não expiraram
       prisma.liteCoinBatch.findMany({ 
         where: { userId, expiresAt: { gt: new Date() } },
         select: { amount: true }
@@ -47,7 +45,6 @@ export default async function MainLayout({ children }: { children: React.ReactNo
     
     if (dbUser) {
       username = dbUser.username;
-      // Soma o valor de todos os lotes de Lite válidos para obter o saldo total
       const totalLite = liteBatches.reduce((sum, batch) => sum + batch.amount, 0);
       userBalance = { premium: dbUser.balancePremium, lite: totalLite };
     }
@@ -67,7 +64,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
             </div>
             <Link href="/" className="hidden md:block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={Logo.src} alt="Gato Comics Logo" style={{ width: 180, height: 'auto' }} />
+              <img src="/assets/logo.png" alt="Gato Comics Logo" style={{ width: 180, height: 'auto' }} />
             </Link>
             <nav className="hidden md:flex items-center gap-2">
               <Link href="/social"><Button variant="link" className="text-black font-semibold text-base hover:bg-black/10">Social</Button></Link>
@@ -78,7 +75,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
              <Link href="/">
                {/* eslint-disable-next-line @next/next/no-img-element */}
-               <img src={Logo.src} alt="Gato Comics Logo" style={{ width: 140, height: 'auto' }} />
+               <img src="/assets/logo.png" alt="Gato Comics Logo" style={{ width: 140, height: 'auto' }} />
              </Link>
           </div>
 
@@ -97,7 +94,9 @@ export default async function MainLayout({ children }: { children: React.ReactNo
                </Link>
             )}
             <div className="md:hidden">
-              <Button variant="ghost" size="icon" className="text-black hover:bg-black/10"><Search className="w-5 h-5"/></Button>
+              <Link href="/busca">
+                <Button variant="ghost" size="icon" className="text-black hover:bg-black/10"><Search className="w-5 h-5"/></Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -105,8 +104,62 @@ export default async function MainLayout({ children }: { children: React.ReactNo
 
       <main className="flex-1">{children}</main>
       
-      <footer className="border-t border-[#27272a] bg-[#0a0a0a] py-12 mt-auto">
-        {/* ... */}
+      {/* --- FOOTER (RODAPÉ) --- */}
+      <footer className="border-t border-[#27272a] bg-[#0a0a0a] pt-16 pb-8 mt-auto">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+            
+            {/* Coluna 1: Marca */}
+            <div className="space-y-4">
+              <Link href="/" className="inline-block">
+                <div className="bg-white rounded-2xl p-4 border-4 border-[#FFD700] shadow-[8px_8px_0px_0px_rgba(255,215,0,1)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/assets/logo.png" alt="Gato Comics Logo" style={{ width: 150, height: 'auto' }} />
+                </div>
+              </Link>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                Sua plataforma definitiva para leitura de webtoons e mangás. 
+              </p>
+            </div>
+
+            {/* Coluna 2: Navegação */}
+            <div>
+              <h3 className="font-bold text-white mb-4">Explorar</h3>
+              <ul className="space-y-2 text-sm text-zinc-400">
+                <li><Link href="/" className="hover:text-[#FFD700] transition-colors">Início</Link></li>
+                <li><Link href="/busca" className="hover:text-[#FFD700] transition-colors">Catálogo</Link></li>
+                <li><Link href="/shop" className="hover:text-[#FFD700] transition-colors">Loja de Patinhas</Link></li>
+                <li><Link href="/social" className="hover:text-[#FFD700] transition-colors">Social</Link></li>
+              </ul>
+            </div>
+
+            {/* Coluna 3: Legal */}
+            <div>
+              <h3 className="font-bold text-white mb-4">Legal</h3>
+              <ul className="space-y-2 text-sm text-zinc-400">
+                <li><Link href="/terms" className="hover:text-[#FFD700] transition-colors">Termos de Uso</Link></li>
+                <li><Link href="/privacy" className="hover:text-[#FFD700] transition-colors">Política de Privacidade</Link></li>
+              </ul>
+            </div>
+
+            {/* Coluna 4: Social */}
+            <div>
+              <h3 className="font-bold text-white mb-4">Siga-nos</h3>
+              <div className="flex gap-4">
+                <a href="https://discord.gg/NNd2mdBYBB" target="_blank" rel="noopener noreferrer">
+                  <Button variant="ghost" size="icon" className="hover:bg-[#5865F2] hover:text-white rounded-full">
+                    <FaDiscord className="w-5 h-5" />
+                  </Button>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-[#27272a] pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-zinc-500">
+            <p>&copy; {new Date().getFullYear()} Gato Comics LTDA. Todos os direitos reservados.</p>
+            <p>Feito com 🐾 para leitores.</p>
+          </div>
+        </div>
       </footer>
     </div>
   );

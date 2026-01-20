@@ -61,8 +61,9 @@ export default function CosmeticsAdminPage() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#111] border-[#27272a] text-white">
                     <SelectItem value="AVATAR_FRAME">Moldura de Avatar</SelectItem>
-                    <SelectItem value="COMMENT_BACKGROUND">Fundo de Comentário</SelectItem>
+                    <SelectItem value="COMMENT_BACKGROUND">Banner de Comentário</SelectItem>
                     <SelectItem value="USERNAME_COLOR">Cor de Nome</SelectItem>
+                    <SelectItem value="PROFILE_BANNER">fundo de Perfil</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
