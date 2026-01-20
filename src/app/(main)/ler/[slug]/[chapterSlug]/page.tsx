@@ -1,10 +1,10 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ChapterNavigation } from "@/components/reader/chapter-navigation";
-import { Lock, ArrowLeft } from "lucide-react";
+import { UnlockView } from "@/components/reader/unlock-view"; // <--- Importe o componente
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 interface ReaderPageProps {
   params: Promise<{ slug: string; chapterSlug: string }>;
@@ -15,7 +15,7 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
   const session = await auth();
   const userId = session?.user?.id;
 
-  // 1. Buscar a Obra e o Capítulo Atual
+  // 1. Buscar Obra, Capítulo e Saldo do Usuário
   const work = await prisma.work.findUnique({
     where: { slug },
     select: { id: true, title: true, slug: true }
@@ -32,39 +32,46 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
 
   if (!chapter) return notFound();
 
-  // 2. Verificar Permissão de Acesso (Trava de Pagamento)
-  const isUnlocked = chapter.isFree || (chapter.unlocks && chapter.unlocks.length > 0);
+  // Verifica se o usuário tem acesso (Grátis, Permanente, ou Aluguel Válido)
+  let isUnlocked = chapter.isFree;
   
+  if (!isUnlocked && chapter.unlocks && chapter.unlocks.length > 0) {
+     const unlock = chapter.unlocks[0];
+     if (unlock.type === 'PERMANENT') isUnlocked = true;
+     else if (unlock.type === 'RENTAL' && unlock.expiresAt && unlock.expiresAt > new Date()) isUnlocked = true;
+  }
+  
+  // --- SE ESTIVER BLOQUEADO, MOSTRA TELA DE COMPRA ---
   if (!isUnlocked) {
-    // Se não estiver desbloqueado, mostra tela de bloqueio
+    // Buscar saldo atualizado do usuário para passar pro componente
+    let userBalance = { lite: 0, premium: 0 };
+    if (userId) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { 
+                balancePremium: true,
+                liteCoinBatches: { where: { expiresAt: { gt: new Date() } } }
+            }
+        });
+        if (user) {
+            const liteTotal = user.liteCoinBatches.reduce((acc, b) => acc + b.amount, 0);
+            userBalance = { lite: liteTotal, premium: user.balancePremium };
+        }
+    }
+
     return (
-        <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 text-center">
-            <div className="bg-[#111] p-8 rounded-2xl border border-[#27272a] max-w-md w-full shadow-2xl">
-                <div className="w-16 h-16 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6 text-[#FFD700]">
-                    <Lock className="w-8 h-8" />
-                </div>
-                <h1 className="text-2xl font-bold text-white mb-2">Capítulo Bloqueado</h1>
-                <p className="text-zinc-400 mb-6">
-                    Este é um capítulo premium de <strong className="text-white">{work.title}</strong>.
-                </p>
-                <div className="grid gap-3">
-                    <Link href={`/obra/${work.slug}`}>
-                        <Button className="w-full bg-[#FFD700] text-black font-bold hover:bg-[#FFD700]/90">
-                            Ir para a página da obra
-                        </Button>
-                    </Link>
-                    <Link href="/shop">
-                        <Button variant="outline" className="w-full border-zinc-700 text-zinc-300">
-                            Comprar Patinhas
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-        </div>
+        <UnlockView 
+            chapterId={chapter.id}
+            priceLite={chapter.priceLite}
+            pricePremium={chapter.pricePremium}
+            userBalance={userBalance}
+            workSlug={work.slug}
+        />
     );
   }
+  // ----------------------------------------------------
 
-  // 3. Registrar Leitura (Histórico)
+  // 3. Registrar Leitura (Histórico) - Se chegou aqui, está desbloqueado
   if (userId) {
     await prisma.libraryEntry.upsert({
         where: { userId_workId: { userId, workId: work.id } },
@@ -73,7 +80,7 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
     });
   }
 
-  // 4. Buscar Próximo e Anterior (Para navegação)
+  // 4. Buscar Próximo e Anterior
   const [prevChapter, nextChapter] = await Promise.all([
     prisma.chapter.findFirst({
         where: { workId: work.id, order: { lt: chapter.order } },
@@ -89,7 +96,6 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
 
   return (
     <div className="min-h-screen bg-[#050505] flex flex-col">
-      {/* Header Simples de Leitura */}
       <header className="h-14 bg-[#111] border-b border-[#27272a] flex items-center px-4 sticky top-0 z-50">
         <Link href={`/obra/${work.slug}`} className="text-zinc-400 hover:text-white transition-colors">
             <ArrowLeft className="w-5 h-5" />
@@ -99,7 +105,6 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
         </span>
       </header>
 
-      {/* ÁREA DE LEITURA (IMAGENS) */}
       <div className="flex-1 flex flex-col items-center bg-black min-h-screen">
          <div className="w-full max-w-3xl">
             {chapter.images.map((img, idx) => (
@@ -109,13 +114,12 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
                     src={img} 
                     alt={`Página ${idx + 1}`} 
                     className="w-full h-auto block"
-                    loading={idx < 2 ? "eager" : "lazy"} // Carrega as 2 primeiras rápido
+                    loading={idx < 2 ? "eager" : "lazy"} 
                 />
             ))}
          </div>
       </div>
 
-      {/* BARRA DE NAVEGAÇÃO (CLIENT COMPONENT) */}
       <ChapterNavigation 
          prevChapter={prevChapter}
          nextChapter={nextChapter}
