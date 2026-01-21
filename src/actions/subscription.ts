@@ -7,98 +7,59 @@ import { revalidatePath } from "next/cache";
 
 type EntitlementState = { error?: string; success?: string; } | null;
 
-/**
- * Vincula ou desvincula uma obra a um slot de assinatura do usuário.
- */
 export async function manageWorkEntitlement(
     prevState: EntitlementState, 
     formData: FormData
 ): Promise<EntitlementState> {
     const session = await auth();
-    if (!session?.user?.id) {
-        return { error: "Login necessário." };
-    }
+    if (!session?.user?.id) return { error: "Login necessário." };
 
     const workId = formData.get("workId") as string;
-    const action = formData.get("action") as "ADD" | "REMOVE";
+    const action = formData.get("action") as "ADD"; // Removemos "REMOVE" do tipo
 
-    if (!workId || !action) {
+    if (!workId || action !== "ADD") {
         return { error: "Ação inválida." };
     }
 
     try {
-        // Selecionamos apenas os campos necessários para validação
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
-                id: true,
                 subscriptionTier: true,
-                subscriptionValidUntil: true, // Importante para checar validade
-                entitlementChangeUntil: true, // Janela de troca
-                _count: { 
-                    select: { workEntitlements: true } 
-                }
+                subscriptionValidUntil: true,
+                _count: { select: { workEntitlements: true } }
             }
         });
 
-        // 1. Verifica se tem assinatura
-        if (!user || !user.subscriptionTier) {
-            return { error: "Você não possui uma assinatura ativa." };
-        }
+        if (!user || !user.subscriptionTier) return { error: "Sem assinatura ativa." };
 
-        // 2. Verifica se a assinatura não expirou
         if (user.subscriptionValidUntil && new Date(user.subscriptionValidUntil) < new Date()) {
-            return { error: "Sua assinatura expirou. Renove para gerenciar obras." };
+            return { error: "Sua assinatura expirou." };
         }
 
-        // Busca as regras do plano
         const planKey = `sub_${user.subscriptionTier.toLowerCase()}`;
-        // @ts-ignore - Caso o tier no banco não bata exatamente com a config (segurança de tipo)
+        // @ts-ignore
         const plan = SUBSCRIPTION_PLANS[planKey];
         
-        if (!plan) return { error: "Erro na configuração do plano." };
+        if (!plan) return { error: "Erro no plano." };
 
-        // --- AÇÃO: ADICIONAR ---
-        if (action === "ADD") {
-            // Verifica limite de slots
-            if (user._count.workEntitlements >= plan.works) {
-                return { error: `Limite atingido! Seu plano permite apenas ${plan.works} obras.` };
-            }
-
-            await prisma.workEntitlement.create({
-                data: { userId: user.id, workId }
-            });
-            
-            revalidatePath("/profile/subscription");
-            return { success: "Obra vinculada com sucesso!" };
-        } 
-        
-        // --- AÇÃO: REMOVER ---
-        else if (action === "REMOVE") {
-            // Verifica janela de troca (7 dias)
-            // Se a data for nula ou já tiver passado, bloqueia a remoção
-            if (!user.entitlementChangeUntil || new Date(user.entitlementChangeUntil) < new Date()) {
-                return { error: "A janela de troca fechou. Você só poderá remover obras na próxima renovação." };
-            }
-
-            await prisma.workEntitlement.delete({
-                where: { userId_workId: { userId: user.id, workId } }
-            });
-            
-            revalidatePath("/profile/subscription");
-            return { success: "Obra removida. O slot foi liberado." };
+        // --- AÇÃO: ADICIONAR (TRAVAR SLOT) ---
+        // Verifica se tem espaço
+        if (user._count.workEntitlements >= plan.works) {
+            return { error: `Todos os seus ${plan.works} slots estão ocupados.` };
         }
 
-        return { error: "Ação desconhecida." };
+        await prisma.workEntitlement.create({
+            data: { userId: session.user.id, workId }
+        });
+        
+        revalidatePath("/profile/subscription");
+        return { success: "Obra desbloqueada e slot travado até a renovação!" };
 
     } catch (error) {
-        console.error("Erro ao gerenciar vínculo:", error);
-        
-        // Tratamento específico do Prisma para duplicidade
         if ((error as any).code === 'P2002') {
-            return { error: "Esta obra já está vinculada à sua conta." };
+            return { error: "Você já desbloqueou esta obra." };
         }
-        
-        return { error: "Ocorreu um erro ao processar sua solicitação." };
+        return { error: "Erro ao processar." };
     }
 }

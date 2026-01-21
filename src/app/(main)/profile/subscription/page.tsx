@@ -11,7 +11,6 @@ import { Crown, CheckCircle, CalendarDays, ExternalLink, AlertTriangle } from "l
 import { EntitlementManager } from "@/components/profile/entitlement-manager";
 import { CancelSubscriptionButton } from "@/components/profile/cancel-button";
 import { createCustomerPortal } from "@/actions/stripe";
-import Stripe from "stripe";
 
 interface PageProps {
   searchParams: Promise<{ success?: string }>;
@@ -23,7 +22,7 @@ export default async function SubscriptionPage(props: PageProps) {
     
     if (!session?.user?.id) redirect("/login");
 
-    // Query otimizada
+    // Busca dados do usuário e obras disponíveis
     const [user, allWorks] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.user.id },
@@ -40,11 +39,13 @@ export default async function SubscriptionPage(props: PageProps) {
 
     if (!user) redirect("/");
 
+    // Verifica se a assinatura está ativa e válida
     const isSubActive = user.subscriptionTier && 
                         user.subscriptionValidUntil && 
                         new Date(user.subscriptionValidUntil) > new Date();
 
-    // Feedback de carregamento pós-pagamento
+    // 1. Feedback de Carregamento (Pós-Pagamento)
+    // Se o usuário acabou de pagar mas o banco ainda não atualizou
     if (searchParams.success === "true" && !isSubActive) {
         return (
             <div className="container mx-auto px-4 py-32 text-center space-y-6 max-w-md">
@@ -53,13 +54,16 @@ export default async function SubscriptionPage(props: PageProps) {
                     <h1 className="text-xl font-bold text-white">Sincronizando assinatura...</h1>
                     <p className="text-sm text-zinc-400 mt-2">O cofre da guilda está processando seu pagamento.</p>
                 </div>
-                <Button variant="outline" className="border-zinc-800 text-white" asChild>
-                    <Link href="/profile/subscription">Atualizar Status</Link>
-                </Button>
+                <Link href="/profile/subscription">
+                    <Button variant="outline" className="border-zinc-800 text-white mt-4">
+                        Atualizar Status
+                    </Button>
+                </Link>
             </div>
         );
     }
 
+    // 2. Estado Sem Assinatura
     if (!isSubActive) {
         return (
             <div className="container mx-auto px-4 py-24 text-center space-y-8 max-w-lg">
@@ -72,29 +76,30 @@ export default async function SubscriptionPage(props: PageProps) {
                         Assine um plano para desbloquear slots de obras, remover anúncios e ganhar patinhas mensais.
                     </p>
                 </div>
-                <Button asChild className="bg-[#FFD700] text-black font-bold hover:bg-[#FFD700]/90 h-12 px-8">
-                    <Link href="/shop">Ver Planos Disponíveis</Link>
-                </Button>
+                <Link href="/shop">
+                    <Button className="bg-[#FFD700] text-black font-bold hover:bg-[#FFD700]/90 h-12 px-8">
+                        Ver Planos Disponíveis
+                    </Button>
+                </Link>
             </div>
         );
     }
     
-    // Buscar status real no Stripe (Safety Check)
+    // 3. Buscar Status no Stripe (Para saber se está cancelada)
     let isCanceled = false;
-    try {
-        if (user.subscriptionId) {
-            const stripeSub = await stripe.subscriptions.retrieve(user.subscriptionId);
+    if (user.subscriptionId) {
+        try {
+            // Usamos 'any' para evitar erros de tipagem com versões beta do SDK
+            const stripeSub: any = await stripe.subscriptions.retrieve(user.subscriptionId);
             isCanceled = stripeSub.cancel_at_period_end;
+        } catch (e) {
+            console.error("Erro ao buscar sub no Stripe (Visualização):", e);
         }
-    } catch (e) {
-        console.error("Erro de conexão com Stripe (Visualização apenas):", e);
-        // Não quebra a página se o Stripe falhar, assume estado atual do banco se possível ou false
     }
 
+    // Configuração do Plano
     const planKey = `sub_${user.subscriptionTier!.toLowerCase()}`;
-    // Fallback seguro se o plano não existir na config
     const plan = SUBSCRIPTION_PLANS[planKey as keyof typeof SUBSCRIPTION_PLANS] || { label: user.subscriptionTier, works: 0 };
-    const isWithinChangeWindow = user.entitlementChangeUntil ? new Date(user.entitlementChangeUntil) > new Date() : false;
 
     return (
         <div className="container mx-auto px-4 py-12 space-y-10 max-w-7xl">
@@ -125,6 +130,7 @@ export default async function SubscriptionPage(props: PageProps) {
                     </div>
                 </div>
                 
+                {/* Botão para Portal do Stripe */}
                 <form action={createCustomerPortal}>
                     <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 w-full md:w-auto">
                         Faturas e Cartões <ExternalLink className="w-4 h-4 ml-2" />
@@ -133,7 +139,8 @@ export default async function SubscriptionPage(props: PageProps) {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* ÁREA PRINCIPAL: Gerenciador de Obras */}
+                
+                {/* ÁREA PRINCIPAL: Gerenciador de Obras (Slots) */}
                 <div className="lg:col-span-2 space-y-6">
                     <Card className="bg-[#0a0a0a] border-[#27272a]">
                         <CardHeader className="border-b border-[#27272a] bg-[#111]">
@@ -144,11 +151,9 @@ export default async function SubscriptionPage(props: PageProps) {
                                         Gerencie as obras desbloqueadas pelo seu plano.
                                     </CardDescription>
                                 </div>
-                                {isWithinChangeWindow ? (
-                                     <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-0">Troca Aberta</Badge>
-                                ) : (
-                                     <Badge variant="outline" className="border-zinc-700 text-zinc-500">Troca Fechada</Badge>
-                                )}
+                                <Badge variant="outline" className="border-zinc-700 text-zinc-500">
+                                    Reset Mensal
+                                </Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="p-6">
@@ -156,7 +161,6 @@ export default async function SubscriptionPage(props: PageProps) {
                                 entitledWorks={user.workEntitlements as any}
                                 allWorks={allWorks}
                                 maxSlots={plan.works}
-                                canChange={isWithinChangeWindow}
                             />
                         </CardContent>
                     </Card>

@@ -28,12 +28,12 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${errorMessage}`, { status: 400 });
   }
 
-  // Casting global do objeto data para any para evitar erros de tipagem em versões beta
+  // Casting global do objeto data para any para evitar erros de tipagem
   const session = event.data.object as any;
   
   try {
     // ====================================================
-    // EVENTO 1: CHECKOUT CONCLUÍDO
+    // EVENTO 1: CHECKOUT CONCLUÍDO (Compras e 1ª Assinatura)
     // ====================================================
     if (event.type === "checkout.session.completed") {
       const userId = session.metadata?.userId;
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         return new NextResponse("Webhook Error: userId ausente.", { status: 200 });
       }
 
-      // --- COMPRA DE PACOTE ---
+      // --- COMPRA DE PACOTE AVULSO ---
       if (session.mode === 'payment' && session.metadata?.type === 'PACK') {
         const packKey = session.metadata?.packKey;
         const pack = packKey ? COIN_PACKS[packKey] : undefined;
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         }
       } 
       
-      // --- PRIMEIRA ASSINATURA ---
+      // --- PRIMEIRA ASSINATURA (Ativação) ---
       else if (session.mode === 'subscription') {
         const planKey = session.metadata?.planKey;
         const plan = planKey ? SUBSCRIPTION_PLANS[planKey] : undefined;
@@ -77,10 +77,10 @@ export async function POST(req: Request) {
         if (subscriptionId && plan) {
           const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
           
-          // CORREÇÃO: Usamos (subscriptionData as any) para forçar o acesso ao campo
+          // Casting seguro para acessar current_period_end
           const periodEndTimestamp = (subscriptionData as any).current_period_end;
           
-          // Fallback caso venha nulo (segurança)
+          // Fallback de segurança para data
           const validDate = periodEndTimestamp 
             ? new Date(periodEndTimestamp * 1000) 
             : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -96,10 +96,13 @@ export async function POST(req: Request) {
                 subscriptionId: subscriptionId,
                 subscriptionTier: tier,
                 subscriptionValidUntil: validDate,
-
-                 entitlementChangeUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
               }
             }),
+            // Limpa slots anteriores por garantia
+            prisma.workEntitlement.deleteMany({
+                 where: { userId }
+            }),
+            // Entrega Patinhas Lite Mensais
             prisma.liteCoinBatch.create({
               data: { userId, amount: plan.monthlyPaws, expiresAt: validDate }
             }),
@@ -116,17 +119,16 @@ export async function POST(req: Request) {
     }
 
     // ====================================================
-    // EVENTO 2: RENOVAÇÃO AUTOMÁTICA
+    // EVENTO 2: RENOVAÇÃO AUTOMÁTICA (Fatura Paga)
     // ====================================================
     if (event.type === "invoice.payment_succeeded") {
-      // CORREÇÃO: Casting para any aqui também
       const invoice = event.data.object as any;
       
+      // Ignora se for a criação inicial (já tratada acima)
       if (invoice.billing_reason === 'subscription_create') {
         return new NextResponse(null, { status: 200 });
       }
 
-      // Acessando subscription com segurança via 'any'
       const subscriptionId = typeof invoice.subscription === 'string' 
         ? invoice.subscription 
         : invoice.subscription?.id;
@@ -137,6 +139,7 @@ export async function POST(req: Request) {
         });
 
         if (!user) {
+          // Retorna 200 para não travar o Stripe em caso de race condition
           return new NextResponse(null, { status: 200 });
         }
 
@@ -145,28 +148,36 @@ export async function POST(req: Request) {
           const plan = SUBSCRIPTION_PLANS[planKey];
           
           const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
-          
-          // CORREÇÃO: Casting para acessar current_period_end
           const periodEndTimestamp = (subscriptionData as any).current_period_end;
           const validDate = new Date(periodEndTimestamp * 1000);
 
           if (plan) {
             await prisma.$transaction([
+              // 1. Estende a validade
               prisma.user.update({
                 where: { id: user.id },
                 data: {
                   subscriptionValidUntil: validDate,
-                  entitlementChangeUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                 }
               }),
+              
+              // 2. RESET DE SLOTS (Logica de consumo mensal)
+              // Removemos todos os vínculos para o usuário escolher novamente neste mês
+              prisma.workEntitlement.deleteMany({
+                where: { userId: user.id }
+              }),
+
+              // 3. Deposita as Patinhas do novo mês
               prisma.liteCoinBatch.create({ 
                 data: { userId: user.id, amount: plan.monthlyPaws, expiresAt: validDate } 
               }),
+
+              // 4. Log
               prisma.transaction.create({ 
                 data: { userId: user.id, amount: plan.monthlyPaws, currency: "LITE", type: "EARN", description: `Renovação Automática: ${plan.label}` } 
               })
             ]);
-            console.log(`🔄 Renovação processada para ${user.email}`);
+            console.log(`🔄 Renovação processada e slots resetados para ${user.email}`);
           }
         }
       }
@@ -176,7 +187,6 @@ export async function POST(req: Request) {
     // EVENTO 3: CANCELAMENTO
     // ====================================================
     if (event.type === 'customer.subscription.deleted') {
-      // Casting seguro
       const subscription = event.data.object as any;
       
       await prisma.user.updateMany({
