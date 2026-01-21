@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+// Definição do tipo para Next.js 15+
+type Props = {
+  params: Promise<{ id: string }>
+}
+
+export async function GET(req: Request, props: Props) {
   try {
+    // CORREÇÃO: Aguardar a Promise dos params
+    const params = await props.params;
     const chapterId = params.id;
 
     // 1. Identificar Usuário

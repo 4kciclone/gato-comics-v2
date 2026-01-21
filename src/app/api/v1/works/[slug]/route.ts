@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
 
-export async function GET(req: Request, { params }: { params: { slug: string } }) {
+// Definição do tipo para Next.js 15+
+type Props = {
+  params: Promise<{ slug: string }>
+}
+
+export async function GET(req: Request, props: Props) {
   try {
+    // CORREÇÃO: Aguardar a Promise dos params
+    const params = await props.params;
     const slug = params.slug;
 
     // 1. Tentar pegar o usuário pelo Token (se estiver logado)
