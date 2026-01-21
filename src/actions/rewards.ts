@@ -121,3 +121,80 @@ export async function watchAdReward() {
   revalidatePath("/");
   return { success: true, amount: AD_REWARD_AMOUNT, remaining: MAX_ADS_PER_DAY - (adCount + 1) };
 }
+
+export async function redeemCode(code: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Faça login para resgatar." };
+
+  const userId = session.user.id;
+  const normalizedCode = code.trim().toUpperCase();
+
+  if (!normalizedCode) return { error: "Código inválido." };
+
+  try {
+    const promo = await prisma.promoCode.findUnique({
+      where: { code: normalizedCode },
+    });
+
+    if (!promo || !promo.isActive) return { error: "Código inválido ou inativo." };
+    if (promo.expiresAt && new Date() > promo.expiresAt) return { error: "Este código expirou." };
+    if (promo.maxUses && promo.usedCount >= promo.maxUses) return { error: "Este código esgotou." };
+
+    const used = await prisma.promoCodeRedemption.findUnique({
+      where: { codeId_userId: { codeId: promo.id, userId } }
+    });
+
+    if (used) return { error: "Você já resgatou este código." };
+
+    // CORREÇÃO AQUI: Tipagem do array de transação
+    const transactionOperations: any[] = [
+      prisma.promoCodeRedemption.create({
+        data: { codeId: promo.id, userId }
+      }),
+      prisma.promoCode.update({
+        where: { id: promo.id },
+        data: { usedCount: { increment: 1 } }
+      }),
+      prisma.transaction.create({
+        data: {
+          userId,
+          amount: promo.amount,
+          currency: promo.type,
+          type: "BONUS",
+          description: `Código: ${promo.code}`
+        }
+      })
+    ];
+
+    if (promo.type === "PREMIUM") {
+        transactionOperations.push(
+            prisma.user.update({
+              where: { id: userId },
+              data: { balancePremium: { increment: promo.amount } }
+            })
+        );
+    } else {
+        transactionOperations.push(
+            prisma.liteCoinBatch.create({
+              data: {
+                userId,
+                amount: promo.amount,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+              }
+            })
+        );
+    }
+
+    await prisma.$transaction(transactionOperations);
+
+    return { 
+        success: true, 
+        amount: promo.amount, 
+        type: promo.type === "PREMIUM" ? "Premium" : "Lite" 
+    };
+
+  } catch (error) {
+    console.error(error);
+    return { error: "Erro ao processar resgate." };
+  }
+}
