@@ -162,7 +162,7 @@ export function SettingsTab({ user }: { user: any }) {
             </div>
             
             {/* Componente de Exclusão */}
-            <DeleteAccountForm />
+            <DeleteAccountForm username={user.username} />
             
         </CardContent>
       </Card>
