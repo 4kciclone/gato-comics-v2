@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { ChapterNavigation } from "@/components/reader/chapter-navigation";
-import { UnlockView } from "@/components/reader/unlock-view"; // <--- Importe o componente
+import { UnlockView } from "@/components/reader/unlock-view";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -26,28 +26,46 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
   const chapter = await prisma.chapter.findUnique({
     where: { workId_slug: { workId: work.id, slug: chapterSlug } },
     include: {
+        // Busca se o usuário comprou este capítulo específico
         unlocks: userId ? { where: { userId } } : false
     }
   });
 
   if (!chapter) return notFound();
 
+  // Bloqueio de segurança: Se não estiver publicado, ninguém vê
   if (chapter.workStatus !== 'PUBLISHED') {
-      return notFound(); // Ou redirecionar para a obra
+      return notFound(); 
   }
 
-  // Verifica se o usuário tem acesso (Grátis, Permanente, ou Aluguel Válido)
-  let isUnlocked = chapter.isFree;
+  // 2. Verificar Permissão de Acesso
   
+  // A) Verifica se tem assinatura ativa para esta obra
+  let hasEntitlement = false;
+  if (userId) {
+      const entitlement = await prisma.workEntitlement.findUnique({
+          where: { userId_workId: { userId, workId: work.id } }
+      });
+      hasEntitlement = !!entitlement;
+  }
+
+  // B) Calcula o acesso final
+  // É desbloqueado se: É Grátis OU Tem Assinatura
+  let isUnlocked = chapter.isFree || hasEntitlement; 
+  
+  // C) Se ainda não estiver desbloqueado, verifica compras avulsas (Rental/Permanent)
   if (!isUnlocked && chapter.unlocks && chapter.unlocks.length > 0) {
      const unlock = chapter.unlocks[0];
-     if (unlock.type === 'PERMANENT') isUnlocked = true;
-     else if (unlock.type === 'RENTAL' && unlock.expiresAt && unlock.expiresAt > new Date()) isUnlocked = true;
+     if (unlock.type === 'PERMANENT') {
+        isUnlocked = true;
+     } else if (unlock.type === 'RENTAL' && unlock.expiresAt && unlock.expiresAt > new Date()) {
+        isUnlocked = true;
+     }
   }
   
-  // --- SE ESTIVER BLOQUEADO, MOSTRA TELA DE COMPRA ---
+  // --- SE CONTINUAR BLOQUEADO, MOSTRA TELA DE COMPRA ---
   if (!isUnlocked) {
-    // Buscar saldo atualizado do usuário para passar pro componente
+    // Buscar saldo atualizado do usuário para passar pro componente de compra
     let userBalance = { lite: 0, premium: 0 };
     if (userId) {
         const user = await prisma.user.findUnique({
@@ -75,7 +93,7 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
   }
   // ----------------------------------------------------
 
-  // 3. Registrar Leitura (Histórico) - Se chegou aqui, está desbloqueado
+  // 3. Registrar Leitura (Histórico) - Se chegou aqui, o usuário tem acesso
   if (userId) {
     await prisma.libraryEntry.upsert({
         where: { userId_workId: { userId, workId: work.id } },
@@ -84,10 +102,11 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
     });
   }
 
-  // 4. Buscar Próximo e Anterior
+  // 4. Buscar Próximo e Anterior (Apenas capítulos PUBLICADOS)
   const [prevChapter, nextChapter] = await Promise.all([
     prisma.chapter.findFirst({
-        where: { workId: work.id, 
+        where: { 
+            workId: work.id, 
             workStatus: 'PUBLISHED',
             order: { lt: chapter.order } 
         },
@@ -95,7 +114,8 @@ export default async function ReaderPage({ params }: ReaderPageProps) {
         select: { slug: true, order: true },
     }),
     prisma.chapter.findFirst({
-        where: { workId: work.id, 
+        where: { 
+            workId: work.id, 
             workStatus: 'PUBLISHED',
             order: { gt: chapter.order } 
         },
