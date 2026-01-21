@@ -10,7 +10,7 @@ import { CommentSection } from "@/components/comments/comment-section";
 import { WorkActions } from "@/components/work/work-actions";
 import { RecommendationsRail } from "@/components/shared/recommendations-rail";
 import { 
-  Play, Heart, Star, BookOpen, Calendar, User as UserIcon, Palette, AlertTriangle
+  Play, Heart, Star, BookOpen, Calendar, User as UserIcon, Palette
 } from "lucide-react";
 import { LibraryEntry, Unlock } from "@prisma/client";
 
@@ -25,7 +25,7 @@ const RATING_CONFIG: Record<string, { label: string; color: string; bg: string }
   DOZE_ANOS: { label: "12", color: "text-yellow-400", bg: "bg-yellow-500" },
   QUATORZE_ANOS: { label: "14", color: "text-orange-500", bg: "bg-orange-500" },
   DEZESSEIS_ANOS: { label: "16", color: "text-red-500", bg: "bg-red-600" },
-  DEZOITO_ANOS: { label: "18", color: "text-black bg-white", bg: "bg-black" }, // Estilo especial para +18
+  DEZOITO_ANOS: { label: "18", color: "text-black bg-white", bg: "bg-black" },
 };
 
 export default async function WorkPage({ params }: Props) {
@@ -48,23 +48,29 @@ export default async function WorkPage({ params }: Props) {
     return notFound();
   }
 
-  // Lógica de usuário (mantida igual)
+  // Variáveis de estado do usuário
   let userHistory: LibraryEntry | null = null;
   let userUnlocks: Map<string, Unlock> = new Map();
   let isLiked = false;
   let userRating = 0;
+  let hasEntitlement = false; // <--- NOVA VARIÁVEL
 
   if (session?.user?.id) {
-    const [history, unlocks, like, review] = await Promise.all([
+    // Adicionamos a busca do entitlement no Promise.all
+    const [history, unlocks, like, review, entitlement] = await Promise.all([
         prisma.libraryEntry.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } } }),
         prisma.unlock.findMany({ where: { userId: session.user.id, chapterId: { in: work.chapters.map(c => c.id) } } }),
         prisma.workLike.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } } }),
         prisma.review.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } }, select: { rating: true } }),
+        // Verifica se a obra está nos slots da assinatura
+        prisma.workEntitlement.findUnique({ where: { userId_workId: { userId: session.user.id, workId: work.id } } })
     ]);
+    
     userHistory = history;
     userUnlocks = new Map(unlocks.map(u => [u.chapterId, u]));
     isLiked = !!like;
     userRating = review?.rating || 0;
+    hasEntitlement = !!entitlement; // <--- Define se tem acesso total
   }
   
   const totalRating = work.reviews.reduce((acc, r) => acc + r.rating, 0);
@@ -81,14 +87,24 @@ export default async function WorkPage({ params }: Props) {
     }
   }
 
+  // Mapeia os capítulos aplicando a lógica de desbloqueio
   const chaptersWithUserStatus = work.chapters.map(chapter => {
     const unlockInfo = userUnlocks.get(chapter.id);
-    const isUnlocked = chapter.isFree || (unlockInfo?.type === 'PERMANENT');
+    
+    // CORREÇÃO AQUI: Se hasEntitlement for true, tudo é desbloqueado
+    const isUnlocked = chapter.isFree || hasEntitlement || (unlockInfo?.type === 'PERMANENT');
+    
+    // Verifica aluguel
     const isRented = unlockInfo?.type === 'RENTAL' && unlockInfo.expiresAt ? unlockInfo.expiresAt > new Date() : false;
-    return { ...chapter, isUnlocked: isUnlocked || isRented, isRented, isRead: userHistory?.lastReadChapterId === chapter.id };
+    
+    return { 
+      ...chapter, 
+      isUnlocked: isUnlocked || isRented, // Se tem assinatura, isUnlocked já é true
+      isRented, 
+      isRead: userHistory?.lastReadChapterId === chapter.id 
+    };
   });
 
-  // Configuração da Classificação
   const ratingInfo = RATING_CONFIG[work.ageRating] || RATING_CONFIG.LIVRE;
 
   return (
