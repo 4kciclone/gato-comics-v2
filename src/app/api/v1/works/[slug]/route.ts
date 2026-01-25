@@ -102,6 +102,8 @@ export async function GET(req: Request, props: Props) {
         author: work.author,
         genres: work.genres,
         isAdult: work.isAdult,
+        ageRating: work.ageRating, // <--- ADICIONE ISTO (Faltava)
+        _count: work._count,
       },
       chapters: chaptersWithStatus
     });
