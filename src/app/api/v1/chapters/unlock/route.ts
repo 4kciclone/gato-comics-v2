@@ -4,9 +4,7 @@ import jwt from "jsonwebtoken";
 
 export async function POST(req: Request) {
   try {
-    // ------------------------------------------------------------------
     // 1. Autenticação
-    // ------------------------------------------------------------------
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     
@@ -19,166 +17,119 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Token inválido" }, { status: 401 });
     }
 
-    // Recebe qual moeda o usuário QUER usar (currency: 'LITE' | 'PREMIUM')
     const { chapterId, type, currency } = await req.json(); 
 
     if (!['RENTAL', 'PERMANENT'].includes(type)) {
-        return NextResponse.json({ error: "Tipo de desbloqueio inválido" }, { status: 400 });
+        return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });
     }
 
-    // ------------------------------------------------------------------
-    // 2. Buscar Dados
-    // ------------------------------------------------------------------
-    const chapter = await prisma.chapter.findUnique({ where: { id: chapterId } });
-    
-    // Precisamos buscar os lotes de Lite Coins válidos se a escolha for LITE
-    const user = await prisma.user.findUnique({ 
-        where: { id: userId },
-        include: { 
-            liteCoinBatches: {
-                where: { expiresAt: { gt: new Date() }, amount: { gt: 0 } }, // Apenas válidos e com saldo
-                orderBy: { expiresAt: 'asc' } // Usar os que vencem logo primeiro
+    // 2. Iniciar Transação do Banco (Atomicidade)
+    // Usamos $transaction interativa para garantir leituras e escritas consistentes
+    const result = await prisma.$transaction(async (tx) => {
+        
+        // A. Buscar Dados Atualizados
+        const chapter = await tx.chapter.findUnique({ where: { id: chapterId } });
+        const user = await tx.user.findUnique({ 
+            where: { id: userId },
+            include: { 
+                liteCoinBatches: {
+                    where: { expiresAt: { gt: new Date() }, amount: { gt: 0 } },
+                    orderBy: { expiresAt: 'asc' } // Consome os que vencem primeiro (FIFO)
+                } 
             } 
-        } 
-    });
+        });
 
-    if (!chapter || !user) return NextResponse.json({ error: "Dados inválidos" }, { status: 404 });
+        if (!chapter || !user) throw new Error("Dados não encontrados");
 
-    // Verificar se já possui desbloqueio
-    const existingUnlock = await prisma.unlock.findUnique({
-        where: { userId_chapterId: { userId, chapterId } }
-    });
+        // B. Verificar se já tem acesso
+        const existingUnlock = await tx.unlock.findUnique({
+            where: { userId_chapterId: { userId, chapterId } }
+        });
 
-    if (existingUnlock) {
-        if (existingUnlock.type === 'PERMANENT') {
-            return NextResponse.json({ success: true, message: "Já possui permanente" });
-        }
-        // Se já tem aluguel ativo, estende ou ignora? 
-        // Aqui assumimos que se ele clicou em comprar de novo, ele quer renovar ou comprar permanentemente.
-    }
-
-    // ------------------------------------------------------------------
-    // 3. Regras de Preço e Saldo
-    // ------------------------------------------------------------------
-    let cost = 0;
-    const dbOperations: any[] = []; // Array para guardar as operações da transação do Prisma
-
-    // --- CASO 1: Compra Permanente (Obrigatoriamente Premium) ---
-    if (type === 'PERMANENT') {
-        if (currency === 'LITE') {
-            return NextResponse.json({ error: "Moedas Lite servem apenas para aluguel." }, { status: 400 });
-        }
-        cost = chapter.pricePremium;
-
-        if (user.balancePremium < cost) {
-            return NextResponse.json({ error: "Saldo Premium insuficiente." }, { status: 402 });
+        // Se já tem permanente, não cobra de novo
+        if (existingUnlock?.type === 'PERMANENT') {
+             return { success: true, message: "Já adquirido" };
         }
 
-        // Operação: Debitar Premium
-        dbOperations.push(
-            prisma.user.update({
+        let cost = 0;
+        let currencyUsed = 'LITE';
+
+        // C. Lógica de Cobrança
+        if (type === 'PERMANENT') {
+            if (currency === 'LITE') throw new Error("Moedas Lite não compram acesso permanente.");
+            
+            cost = chapter.pricePremium;
+            if (user.balancePremium < cost) throw new Error("Saldo Premium insuficiente.");
+
+            await tx.user.update({
                 where: { id: userId },
                 data: { balancePremium: { decrement: cost } }
-            })
-        );
-    } 
-    
-    // --- CASO 2: Aluguel (Pode ser Lite ou Premium) ---
-    else {
-        cost = chapter.priceLite;
+            });
+            currencyUsed = 'PREMIUM';
 
-        if (currency === 'PREMIUM') {
-            // Usuário escolheu gastar Premium para alugar
-            if (user.balancePremium < cost) {
-                return NextResponse.json({ error: "Saldo Premium insuficiente." }, { status: 402 });
-            }
-            dbOperations.push(
-                prisma.user.update({
+        } else { // RENTAL
+            cost = chapter.priceLite;
+
+            if (currency === 'PREMIUM') {
+                if (user.balancePremium < cost) throw new Error("Saldo Premium insuficiente.");
+                await tx.user.update({
                     where: { id: userId },
                     data: { balancePremium: { decrement: cost } }
-                })
-            );
+                });
+                currencyUsed = 'PREMIUM';
+            } else {
+                // Gastar Lite (FIFO)
+                const totalLite = user.liteCoinBatches.reduce((acc, b) => acc + b.amount, 0);
+                if (totalLite < cost) throw new Error("Saldo Lite insuficiente.");
 
-        } else {
-            // Usuário escolheu gastar LITE
-            // 1. Calcular saldo total de Lite disponível
-            const totalLite = user.liteCoinBatches.reduce((acc, batch) => acc + batch.amount, 0);
-
-            if (totalLite < cost) {
-                return NextResponse.json({ error: "Saldo Lite insuficiente. Use Premium ou compre mais." }, { status: 402 });
-            }
-
-            // 2. Lógica de Consumo de Lotes (Burn Logic)
-            let remainingCost = cost;
-            
-            for (const batch of user.liteCoinBatches) {
-                if (remainingCost <= 0) break;
-
-                const deduction = Math.min(batch.amount, remainingCost); // Tira o que der deste lote
-                
-                // Operação: Atualizar ou Deletar o lote
-                if (batch.amount - deduction === 0) {
-                    // Se zerou o lote, deletamos para limpar o banco (opcional, pode só setar 0)
-                    dbOperations.push(
-                        prisma.liteCoinBatch.delete({ where: { id: batch.id } })
-                    );
-                } else {
-                    dbOperations.push(
-                        prisma.liteCoinBatch.update({
+                let remainingCost = cost;
+                for (const batch of user.liteCoinBatches) {
+                    if (remainingCost <= 0) break;
+                    
+                    const deduction = Math.min(batch.amount, remainingCost);
+                    
+                    if (batch.amount - deduction === 0) {
+                        await tx.liteCoinBatch.delete({ where: { id: batch.id } });
+                    } else {
+                        await tx.liteCoinBatch.update({
                             where: { id: batch.id },
                             data: { amount: { decrement: deduction } }
-                        })
-                    );
+                        });
+                    }
+                    remainingCost -= deduction;
                 }
-
-                remainingCost -= deduction;
+                currencyUsed = 'LITE';
             }
         }
-    }
 
-    // ------------------------------------------------------------------
-    // 4. Finalizar Transação (Log + Unlock)
-    // ------------------------------------------------------------------
-    
-    // Operação: Criar Log de Transação
-    dbOperations.push(
-        prisma.transaction.create({
+        // D. Registrar Transação
+        await tx.transaction.create({
             data: {
                 userId,
                 amount: -cost,
-                currency: currency === 'PREMIUM' ? 'PREMIUM' : 'LITE',
+                currency: currencyUsed as any,
                 type: 'SPEND',
-                description: `${type === 'PERMANENT' ? 'Compra' : 'Aluguel'} Cap. ${chapter.order} - ${chapter.title}`
+                description: `${type === 'PERMANENT' ? 'Compra' : 'Aluguel'} Cap. ${chapter.order}`
             }
-        })
-    );
+        });
 
-    // Operação: Criar ou Atualizar o Unlock
-    const expiresAt = type === 'RENTAL' ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) : null; // 3 dias
+        // E. Criar/Atualizar Unlock
+        const expiresAt = type === 'RENTAL' ? new Date(Date.now() + 72 * 60 * 60 * 1000) : null; // 72 horas
 
-    dbOperations.push(
-        prisma.unlock.upsert({
+        await tx.unlock.upsert({
             where: { userId_chapterId: { userId, chapterId } },
-            create: {
-                userId,
-                chapterId,
-                type: type,
-                expiresAt
-            },
-            update: {
-                type: type,
-                expiresAt // Se já existia, renova o prazo ou vira permanente
-            }
-        })
-    );
+            create: { userId, chapterId, type, expiresAt },
+            update: { type, expiresAt }
+        });
 
-    // Executa tudo junto
-    await prisma.$transaction(dbOperations);
+        return { success: true };
+    });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(result);
 
-  } catch (error) {
-    console.error("Erro no Unlock:", error);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erro unlock:", error.message);
+    const status = error.message.includes("insuficiente") ? 402 : 500;
+    return NextResponse.json({ error: error.message || "Erro interno" }, { status });
   }
 }
