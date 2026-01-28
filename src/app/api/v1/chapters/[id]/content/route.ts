@@ -11,6 +11,9 @@ export async function GET(req: Request, props: Props) {
     const params = await props.params;
     const chapterId = params.id;
 
+    console.log(`[API] Content Request para Chapter: ${chapterId}`);
+
+
     if (!chapterId || chapterId === 'undefined') {
         return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
@@ -29,6 +32,8 @@ export async function GET(req: Request, props: Props) {
       }
     }
 
+    console.log(`[API] UserId identificado: ${userId}`);
+
     // 2. Buscar Capítulo
     const chapter = await prisma.chapter.findUnique({
       where: { id: chapterId },
@@ -41,6 +46,10 @@ export async function GET(req: Request, props: Props) {
     if (!chapter) {
       return NextResponse.json({ error: "Capítulo não encontrado" }, { status: 404 });
     }
+
+     if (!chapter) console.log("[API] Capítulo não encontrado no DB");
+     else console.log(`[API] Capítulo encontrado. É grátis? ${chapter.isFree}`);
+
 
     // 3. Verificação de Bloqueio
     if (!chapter.isFree) {
@@ -55,6 +64,8 @@ export async function GET(req: Request, props: Props) {
       const unlock = await prisma.unlock.findUnique({
         where: { userId_chapterId: { userId, chapterId } }
       });
+
+      console.log(`[API] Unlock status:`, unlock);
 
       const isRented = unlock?.type === 'RENTAL' && unlock.expiresAt && new Date(unlock.expiresAt) > new Date();
       const isOwned = unlock?.type === 'PERMANENT';
